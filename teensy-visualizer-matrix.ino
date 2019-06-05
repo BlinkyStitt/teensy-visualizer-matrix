@@ -70,7 +70,7 @@ CHSV outputsStretched[numSpreadOutputs];
 
 // outputs repeats across this. then text or sprites are added
 // TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive. we might want negative for Y
-cLEDMatrix<numLEDsX, numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> leds;
+cLEDMatrix<numLEDsX, -numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> leds;
 
 // TODO: because of how we fade the visualizer slowly, we might want to have a seperate matrix for these
 //       then add them together in a third that actually gets displayed
