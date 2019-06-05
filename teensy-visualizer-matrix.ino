@@ -522,6 +522,10 @@ void mapOutputsToSpreadOutputs() {
   }
 }
 
+float map_float(float x, float in_min, float in_max, float out_min, float out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 // TODO: args instead of globals
 void mapSpreadOutputsToLEDmatrix() {
   // shift increments each frame and is used to slowly modify the pattern
@@ -551,15 +555,24 @@ void mapSpreadOutputsToLEDmatrix() {
     if (new_color.value >= value_min) {
       // use the value to calculate the height for this color
       // TODO: tune this. we might want a more interesting curve
-      uint value = map(new_color.value, value_min, 255, 0, numLEDsY);
+      // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
+      // notice that we do NOT use value_min for in_min on map. instead we use the actual range of the LED
+      float highestIndexToLight_f = map_float(new_color.value, 0, 255, 0, numLEDsY);
+
+      uint highestIndexToLight = uint(highestIndexToLight_f);
 
       // we are using height instead of brightness to represent how loud the frequency was
       // so set to max brightness
-      // TODO: maybe only the top should be max? play with this
       new_color.value = 255;
 
       for (uint y = 0; y < numLEDsY; y++) {
-        if (y <= value) {
+        if (y < highestIndexToLight) {
+          leds(x, y) = new_color;
+        } else if (y == highestIndexToLight) {
+          // the highest lit pixel will have a variable brightness to match the volume
+          // TODO: tune this. we might want a more interesting curve. value_min night need to be a larger value to prevent flickering
+          new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, value_min, 255.0));
+
           leds(x, y) = new_color;
         } else {
           // TODO: this is probably going to make animated text and sprites look blurry
