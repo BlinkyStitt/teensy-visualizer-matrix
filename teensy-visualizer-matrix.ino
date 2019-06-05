@@ -69,8 +69,9 @@ CHSV outputs[numOutputs];
 CHSV outputsStretched[numSpreadOutputs];
 
 // outputs repeats across this. then text or sprites are added
-// TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive. we might want negative for Y
-cLEDMatrix<numLEDsX, -numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> leds;
+// TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive
+// TODO: we might want negative for Y, but using uint is breaking that
+cLEDMatrix<numLEDsX, numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> leds;
 
 // TODO: because of how we fade the visualizer slowly, we might want to have a seperate matrix for these
 //       then add them together in a third that actually gets displayed
@@ -78,8 +79,11 @@ cLEDSprites Sprites(&leds);
 cLEDText ScrollingMsg;
 
 // slide the leds over 1 every X frames
-// TODO: change this now that the LEDs are denser?
-const uint frames_per_shift = 87;  // 174 frames * 11.5 ms/frame = 2001ms
+// TODO: tune this now that the LEDs are denser. this might be way too fast
+const float seconds_for_full_rotation = 16.0;
+const float ms_per_frame = 11.5;  // don't touch this. this is set by the audio processing
+// 0.5 is added for rounding up
+const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / (2.0 * numLEDsX) / ms_per_frame + 0.5);
 
 // how close a sound has to be to the loudest sound in order to activate
 const float activate_difference = 0.98;
