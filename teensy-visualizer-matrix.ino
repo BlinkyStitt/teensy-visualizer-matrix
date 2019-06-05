@@ -69,9 +69,11 @@ CHSV outputs[numOutputs];
 CHSV outputsStretched[numSpreadOutputs];
 
 // outputs repeats across this. then text or sprites are added
-// TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive
+// TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive. we might want negative for Y
 cLEDMatrix<numLEDsX, numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> leds;
 
+// TODO: because of how we fade the visualizer slowly, we might want to have a seperate matrix for these
+//       then add them together in a third that actually gets displayed
 cLEDSprites Sprites(&leds);
 cLEDText ScrollingMsg;
 
@@ -115,20 +117,21 @@ unsigned long lastUpdate = 0;
  * with help from https://phoxis.org/2012/07/12/get-sorted-index-orderting-of-an-array/
  */
 static int compare_levels(const void *a, const void *b) {
+  // TODO: check for uint to int overflow issues
   int aa = *((int *)a), bb = *((int *)b);
   return (currentLevel[bb] / maxLevel[bb]) - (currentLevel[aa] / maxLevel[aa]);
 }
 
-float FindE(int bands, int minBin, int maxBin) {
+float FindE(uint bands, uint minBin, uint maxBin) {
   // https://forum.pjrc.com/threads/32677-Is-there-a-logarithmic-function-for-FFT-bin-selection-for-any-given-of-bands?p=133842&viewfull=1#post133842
   float increment = 0.1, eTest, n;
-  int b, count, d;
+  uint b, count, d;
 
   for (eTest = 1; eTest < maxBin; eTest += increment) { // Find E through brute force calculations
     count = minBin;
     for (b = 0; b < bands; b++) { // Calculate full log values
       n = pow(eTest, b);
-      d = int(n + 0.5);
+      d = uint(n + 0.5);
       count += d;
     }
 
@@ -150,7 +153,7 @@ float FindE(int bands, int minBin, int maxBin) {
 void setupFFTBins() {
   // https://forum.pjrc.com/threads/32677-Is-there-a-logarithmic-function-for-FFT-bin-selection-for-any-given-of-bands?p=133842&viewfull=1#post133842
   float e, n;
-  int count = minBin, d;
+  uint count = minBin, d;
 
   e = FindE(numFreqBands, minBin, maxBin); // Find calculated E value
 
@@ -511,7 +514,7 @@ void mapOutputsToSpreadOutputs() {
 void mapSpreadOutputsToLEDmatrix() {
   // shift increments each frame and is used to slowly modify the pattern
   // TODO: test this now that we are on a matrix
-  static unsigned int shift = 0;
+  static uint shift = 0;
 
   // TODO: should this be static?
   static CHSV new_color;
