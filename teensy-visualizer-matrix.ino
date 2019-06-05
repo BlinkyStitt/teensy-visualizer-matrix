@@ -201,18 +201,31 @@ void setupLights() {
 
   FastLED.setBrightness(DEFAULT_BRIGHTNESS); // TODO: read this from the SD card
 
+  // clear all the arrays
+  for (uint i = 0; i < numFreqBands; i++) {
+    frequencyColors[i].value = 0;
+  }
+  for (uint i = 0; i < numOutputs; i++) {
+    outputs[i].value = 0;
+  }
+  for (uint i = 0; i < numSpreadOutputs; i++) {
+    outputsStretched[i].value = 0;
+  }
+  FastLED.clear(true);
+
   // TODO: remove this after debug?
+  delay(500);
+  FastLED.showColor(CRGB::Red, 255);
+  delay(500);
+  FastLED.showColor(CRGB::Lime, 255);
+  delay(500);
+  FastLED.showColor(CRGB::Blue, 255);
+  delay(500);
+  FastLED.showColor(CRGB::White, 85);
+  delay(500);
   FastLED.clear(true);
-  delay(500);
-  FastLED.showColor(CRGB::Red);
-  delay(500);
-  FastLED.showColor(CRGB::Lime);
-  delay(500);
-  FastLED.showColor(CRGB::Blue);
-  delay(500);
-  FastLED.showColor(CRGB::White);
-  delay(500);
-  FastLED.clear(true);
+  // TODO: END remove this after debug?
+
   FastLED.show();
 
   // TODO: turn off onboard LED
@@ -503,10 +516,9 @@ void mapFrequencyColorsToOutputs() {
 
 // TODO: args instead of globals
 void mapOutputsToSpreadOutputs() {
-  // TODO: change this to add blanks instead of copying the color multiple times
-  // TODO: actually that sounds really inefficient since a ton of spots will just be black
-  for (uint i = 0; i < numSpreadOutputs; i++) {
-    outputsStretched[i] = outputs[map(i, 0, numSpreadOutputs, 0, numOutputs)];
+  // TODO: this seems really inefficient since a ton of spots will just be black. it makes the code simple though
+  for (uint i = 0; i < numSpreadOutputs; i += ledsPerSpreadOutput) {
+    outputsStretched[i] = outputs[i / ledsPerSpreadOutput];
   }
 }
 
