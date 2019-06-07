@@ -59,6 +59,10 @@ const uint numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
 const uint numLEDsX = 64;
 const uint numLEDsY = 8;
 
+const uint visualizerNumLEDsX = 32;
+const uint visualizerNumLEDsY = numLEDsY;
+// TODO: make sure visualizerNumLEDsX fits evenly inside numLEDsX
+
 uint freqBands[numFreqBands];
 CHSV frequencyColors[numFreqBands];
 
@@ -72,10 +76,12 @@ CHSV outputsStretched[numSpreadOutputs];
 // TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive
 // TODO: we might want negative for Y, but using uint is breaking that
 cLEDMatrix<numLEDsX, numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> leds;
+cLEDMatrix<numLEDsX, numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> spirte_matrix;
+cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, HORIZONTAL_ZIGZAG_MATRIX> visualizer_matrix;
 
 // TODO: because of how we fade the visualizer slowly, we might want to have a seperate matrix for these
 //       then add them together in a third that actually gets displayed
-cLEDSprites Sprites(&leds);
+cLEDSprites Sprites(&spirte_matrix);
 cLEDText ScrollingMsg;
 
 // slide the leds over 1 every X frames
@@ -531,7 +537,7 @@ float map_float(float x, float in_min, float in_max, float out_min, float out_ma
 }
 
 // TODO: args instead of globals
-void mapSpreadOutputsToLEDmatrix() {
+void mapSpreadOutputsToVisualizerMatrix() {
   // shift increments each frame and is used to slowly modify the pattern
   // TODO: test this now that we are on a matrix
   static uint shift = 0;
@@ -539,20 +545,20 @@ void mapSpreadOutputsToLEDmatrix() {
   // TODO: should this be static?
   static CHSV new_color;
 
-  for (uint x = 0; x < numLEDsX; x++) {
-    uint shifted_x = (shift / frames_per_shift + x) % numLEDsX;
+  for (uint x = 0; x < visualizerNumLEDsX; x++) {
+    uint shifted_x = (shift / frames_per_shift + x) % visualizerNumLEDsX;
 
-    if (numSpreadOutputs == numLEDsX) {
+    if (numSpreadOutputs == visualizerNumLEDsX) {
       new_color = outputsStretched[shifted_x];
     } else {
       // numFreqBands can be bigger or smaller than numOutputs
       // TODO: test this with large and small values of numSpreadOutputs vs numLEDs
-      if (numSpreadOutputs < numLEDsX) {
+      if (numSpreadOutputs < visualizerNumLEDsX) {
         // simple repeat of the pattern
         new_color = outputsStretched[shifted_x % numSpreadOutputs];
       } else {
         // pattern is larger than numLEDs
-        new_color = outputsStretched[shifted_x % numLEDsX];
+        new_color = outputsStretched[shifted_x % visualizerNumLEDsX];
       }
     }
 
@@ -561,7 +567,7 @@ void mapSpreadOutputsToLEDmatrix() {
       // TODO: tune this. we might want a more interesting curve
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
       // notice that we do NOT use value_min for in_min on map. instead we use the actual range of the LED
-      float highestIndexToLight_f = map_float(new_color.value, 0, 255, 0, numLEDsY);
+      float highestIndexToLight_f = map_float(new_color.value, 0, 255, 0, visualizerNumLEDsY);
 
       uint highestIndexToLight = uint(highestIndexToLight_f);
 
@@ -569,25 +575,25 @@ void mapSpreadOutputsToLEDmatrix() {
       // so set to max brightness
       new_color.value = 255;
 
-      for (uint y = 0; y < numLEDsY; y++) {
+      for (uint y = 0; y < visualizerNumLEDsY; y++) {
         if (y < highestIndexToLight) {
-          leds(x, y) = new_color;
+          visualizer_matrix(x, y) = new_color;
         } else if (y == highestIndexToLight) {
           // the highest lit pixel will have a variable brightness to match the volume
           // TODO: tune this. we might want a more interesting curve. value_min night need to be a larger value to prevent flickering
           new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, value_min, 255.0));
 
-          leds(x, y) = new_color;
+          visualizer_matrix(x, y) = new_color;
         } else {
           // TODO: this is probably going to make animated text and sprites look blurry
-          leds(x, y).fadeToBlackBy(fade_factor);
+          visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
         }
       }
     } else {
       // if new_color is black or close to it, we fade rather then set to black
       // TODO: this is probably going to make animated text and sprites look blurry
       for (uint y = 0; y < numLEDsY; y++) {
-        leds(x, y).fadeToBlackBy(fade_factor);
+        visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
       }
     }
   }
@@ -595,14 +601,28 @@ void mapSpreadOutputsToLEDmatrix() {
   shift++;
 }
 
+void combineMatrixes() {
+  // TODO: what should we do here? how should we overlay/interleave the different matrixes into one?
+
+  // TODO: for each x and y of the display matrix
+    // TODO: if text, display text
+    // TODO: else if sprite, display sprite
+    // TODO: else display visualizer
+}
+
 void loop() {
   if (fft1024.available()) {
     updateFrequencyColors();
 
-    // I'm sure this could be a lot more efficient
+    // TODO: pass args to these functions instead of modifying globals
     mapFrequencyColorsToOutputs();
     mapOutputsToSpreadOutputs();
-    mapSpreadOutputsToLEDmatrix();
+    mapSpreadOutputsToVisualizerMatrix();
+
+    // TODO: render sprites
+    // TODO: render text
+
+    combineMatrixes();
 
     // TODO: draw sprites? draw text? or should that be outside this loop?
 
