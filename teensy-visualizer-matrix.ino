@@ -23,18 +23,12 @@
 #define SPI_MOSI_PIN 7  // alt pin for use with audio board
 #define RED_LED 13
 #define SPI_SCK_PIN 14  // alt pin for use with audio board
+// TODO: pin to check battery level?
 
 #define LED_CHIPSET APA102
 #define LED_MODE BGR
 
 #define DEFAULT_BRIGHTNESS 70 // TODO: read from SD. was 52 for 5v leds
-
-AudioInputI2S i2s1;  // xy=139,91
-AudioOutputI2S i2s2; // xy=392,32
-AudioAnalyzeFFT1024 fft1024;
-AudioConnection patchCord1(i2s1, 0, i2s2, 0);
-AudioConnection patchCord2(i2s1, 0, fft1024, 0);
-AudioControlSGTL5000 audioShield; // xy=366,225
 
 // each frequencyBin = ~43Hz
 const uint minBin = 1;   // skip 0-43Hz. it's too noisy
@@ -42,11 +36,6 @@ const uint maxBin = 373; // skip over 16kHz
 
 const uint numOutputs = 8; // this needs to fit into a 64 wide matrix
 const uint numFreqBands = 16;  // this will grow/shrink to fit inside numOutput. TODO: what should this be? maybe just do 8
-
-// we don't want all the levels to be on at once
-// TODO: change this now that we are connected to a matrix
-const uint maxOn = numOutputs * 3 / 4;
-uint numOn = 0;
 
 // the shortest amount of time to leave an output on
 // TODO: tune this!
@@ -67,22 +56,24 @@ uint freqBands[numFreqBands];
 CHSV frequencyColors[numFreqBands];
 
 // frequencyColors are stretched/squished to fit this (squishing being what you probably want)
+// TODO: rename this to something more descriptive. or maybe get rid of it and store directly on the visualizer_matrix
 CHSV outputs[numOutputs];
 
 // outputs are stretched to fit this
+// TODO: rename this to something more descriptive. or maybe get rid of it and store directly on the visualizer_matrix
 CHSV outputsStretched[numSpreadOutputs];
 
-// outputs repeats across this. then text or sprites are added
 // TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive
 // TODO: we might want negative for Y, but using uint is breaking that
-cLEDMatrix<numLEDsX, numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> leds;
-cLEDMatrix<numLEDsX, numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> spirte_matrix;
 cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, HORIZONTAL_ZIGZAG_MATRIX> visualizer_matrix;
 
-// TODO: because of how we fade the visualizer slowly, we might want to have a seperate matrix for these
-//       then add them together in a third that actually gets displayed
-cLEDSprites Sprites(&spirte_matrix);
+// because of how we fade the visualizer slowly, we need to have a seperate matrix for the sprites and text
+cLEDMatrix<numLEDsX, numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> sprite_matrix;
+cLEDSprites Sprites(&sprite_matrix);
 cLEDText ScrollingMsg;
+
+// the sprites and visualizer get combined into this
+cLEDMatrix<numLEDsX, numLEDsY, HORIZONTAL_ZIGZAG_MATRIX> leds;
 
 // slide the leds over 1 every X frames
 // TODO: tune this now that the LEDs are denser. this might be way too fast
@@ -107,6 +98,18 @@ const float scale_neighbor_brightness = 1.1;
 // how quickly to fade to black
 const uint value_min = 25;
 const uint fade_factor = 16;
+
+AudioInputI2S i2s1;  // xy=139,91
+AudioOutputI2S i2s2; // xy=392,32
+AudioAnalyzeFFT1024 fft1024;
+AudioConnection patchCord1(i2s1, 0, i2s2, 0);
+AudioConnection patchCord2(i2s1, 0, fft1024, 0);
+AudioControlSGTL5000 audioShield; // xy=366,225
+
+// we don't want all the levels to be on at once
+// TODO: change this now that we are connected to a matrix
+const uint maxOn = numOutputs * 3 / 4;
+uint numOn = 0;
 
 // keep track of the max volume for each frequency band (slowly decays)
 float maxLevel[numFreqBands];
