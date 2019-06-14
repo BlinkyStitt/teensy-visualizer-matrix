@@ -3,7 +3,7 @@
 #include "bs_debug.h"
 
 // TODO: not sure about this
-#define FASTLED_ALLOW_INTERRUPTS 0
+// #define FASTLED_ALLOW_INTERRUPTS 0
 
 #include <stdlib.h>
 
@@ -31,7 +31,8 @@
 #define LED_CHIPSET APA102
 #define LED_MODE BGR
 
-#define DEFAULT_BRIGHTNESS 30 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
+// TODO: use volume knob for setting brightness. a light sensor could maybe work
+#define DEFAULT_BRIGHTNESS 40 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
 
 // each frequencyBin = ~43Hz
 const uint minBin = 1;   // skip 0-43Hz. it's too noisy
@@ -44,16 +45,16 @@ const uint numFreqBands = 8;  // this will grow/shrink to fit inside numOutput. 
 // TODO: tune this!
 const uint minOnMs = 337; // 118? 150? 184? 200? 250?
 
-const uint numLEDsX = 32; // TODO: bump to 32 once we figure out power and timings;
-const uint numLEDsY = 8;
+const uint16_t numLEDsX = 64; // TODO: might need to drop this to 32 and have 2 sets of pins
+const uint16_t numLEDsY = 8;
 
 // TODO: spread used to mean turn multiple on. now i want it to be a gap
-const uint ledsPerSpreadOutput = 4;
+const uint ledsPerSpreadOutput = 2;
 const uint numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
 // TODO: make sure numSpreadOutputs fits evenly inside numLEDsX
 
 // TO
-const uint16_t visualizerNumLEDsX = numLEDsX;
+const uint16_t visualizerNumLEDsX = 16;
 const uint16_t visualizerNumLEDsY = numLEDsY;
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 
@@ -102,7 +103,7 @@ const float scale_overall_max = 0.4;
 const float scale_neighbor_brightness = 1.1;
 // how quickly to fade to black
 const uint value_min = 25;
-const uint fade_factor = 6;  // was 16 on the hat
+const uint fade_factor = 6;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
 
 AudioInputI2S i2s1;  // xy=139,91
 AudioOutputI2S i2s2; // xy=392,32
@@ -129,6 +130,7 @@ unsigned long turnOffMsArray[numFreqBands];
 
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
 unsigned long lastUpdate = 0;
+unsigned long lastDraw = 0;
 
 /* sort the levels normalized against their max
  *
@@ -208,17 +210,25 @@ void setupSD() {
   // read values from the SD card using IniFile
 }
 
+void colorPattern(CRGB::HTMLColorCode color) {
+  for (uint16_t x = 0; x < numLEDsX; x++) {
+    uint16_t y = x % numLEDsY;
+    leds(x, y) = color;
+  }
+}
+
 void setupLights() {
+  // TODO: turn off onboard LED
   // TODO: clock select pin for FastLED to OUTPUT like we do for the SDCARD?
-  // testing showed the max rate to be somewhere over 2mhz. not nearly as fast as i expected.
-  // TODO: put back to leds instead of visualizer matrix
-  FastLED.addLeds<LED_CHIPSET, MATRIX_FRONT_DATA_PIN, MATRIX_FRONT_CLOCK_PIN, LED_MODE, DATA_RATE_MHZ(2)>(visualizer_matrix[0], visualizer_matrix.Size()).setCorrection(TypicalSMD5050);
+
+  // for one panel, 2mhz worked. when a second panel was added, 2mhz crashed after a few seconds, but 1mhz is working on my test code 
+  FastLED.addLeds<LED_CHIPSET, MATRIX_FRONT_DATA_PIN, MATRIX_FRONT_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(900)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
   // FastLED.addLeds<LED_CHIPSET, MATRIX_BACK_DATA_PIN, MATRIX_BACK_CLOCK_PIN, LED_MODE, DATA_RATE_MHZ(2)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
 
   // TODO: what should this be set to? the flexible panels are much larger
   // led max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
   // FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 5 * 1000 * 2);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 1000);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 500);
 
   FastLED.setBrightness(DEFAULT_BRIGHTNESS); // TODO: read this from the SD card
 
@@ -236,120 +246,22 @@ void setupLights() {
   FastLED.clear(true);
 
   Serial.println("Showing red...");
-//   FastLED.showColor(CRGB::Red, 127); // this flickers with just 16
-  leds(0, 0) = CRGB::Red;
-  leds(1, 1) = CRGB::Red;
-  leds(2, 2) = CRGB::Red;
-  leds(3, 3) = CRGB::Red;
-  leds(4, 4) = CRGB::Red;
-  leds(5, 5) = CRGB::Red;
-  leds(6, 6) = CRGB::Red;
-  leds(7, 7) = CRGB::Red;
-  leds(8, 7) = CRGB::Red;
-  leds(9, 6) = CRGB::Red;
-  leds(10, 5) = CRGB::Red;
-  leds(11, 4) = CRGB::Red;
-  leds(12, 3) = CRGB::Red;
-  leds(13, 2) = CRGB::Red;
-  leds(14, 1) = CRGB::Red;
-  leds(15, 0) = CRGB::Red;
-  leds(16, 0) = CRGB::Red;
-  leds(17, 1) = CRGB::Red;
-  leds(18, 2) = CRGB::Red;
-  leds(19, 3) = CRGB::Red;
-  leds(20, 4) = CRGB::Red;
-  leds(21, 5) = CRGB::Red;
-  leds(22, 6) = CRGB::Red;
-  leds(23, 7) = CRGB::Red;
-  leds(24, 7) = CRGB::Red;
-  leds(25, 6) = CRGB::Red;
-  leds(26, 5) = CRGB::Red;
-  leds(27, 4) = CRGB::Red;
-  leds(28, 3) = CRGB::Red;
-  leds(29, 2) = CRGB::Red;
-  leds(30, 1) = CRGB::Red;
-  leds(31, 0) = CRGB::Red;
+  colorPattern(CRGB::Red);
   FastLED.show();
-  // FastLED.delay(1000);
+  // TODO: fastled.delay is sending refreshes too quickly and crashing
+  delay(2000);
 
   Serial.println("Showing green...");
-//   FastLED.showColor(CRGB::Green, 127);
-  leds(0, 0) = CRGB::Green;
-  leds(1, 1) = CRGB::Green;
-  leds(2, 2) = CRGB::Green;
-  leds(3, 3) = CRGB::Green;
-  leds(4, 4) = CRGB::Green;
-  leds(5, 5) = CRGB::Green;
-  leds(6, 6) = CRGB::Green;
-  leds(7, 7) = CRGB::Green;
-  leds(8, 7) = CRGB::Green;
-  leds(9, 6) = CRGB::Green;
-  leds(10, 5) = CRGB::Green;
-  leds(11, 4) = CRGB::Green;
-  leds(12, 3) = CRGB::Green;
-  leds(13, 2) = CRGB::Green;
-  leds(14, 1) = CRGB::Green;
-  leds(15, 0) = CRGB::Green;
-  leds(16, 0) = CRGB::Green;
-  leds(17, 1) = CRGB::Green;
-  leds(18, 2) = CRGB::Green;
-  leds(19, 3) = CRGB::Green;
-  leds(20, 4) = CRGB::Green;
-  leds(21, 5) = CRGB::Green;
-  leds(22, 6) = CRGB::Green;
-  leds(23, 7) = CRGB::Green;
-  leds(24, 7) = CRGB::Green;
-  leds(25, 6) = CRGB::Green;
-  leds(26, 5) = CRGB::Green;
-  leds(27, 4) = CRGB::Green;
-  leds(28, 3) = CRGB::Green;
-  leds(29, 2) = CRGB::Green;
-  leds(30, 1) = CRGB::Green;
-  leds(31, 0) = CRGB::Green;
+  colorPattern(CRGB::Green);
   FastLED.show();
-  // FastLED.delay(1000);
+  // TODO: fastled.delay is sending refreshes too quickly and crashing
+  delay(2000);
 
-  // TODO: this is not showing
   Serial.println("Showing blue...");
-//   FastLED.showColor(CRGB::Blue, 127);
-  leds(0, 0) = CRGB::Blue;
-  leds(1, 1) = CRGB::Blue;
-  leds(2, 2) = CRGB::Blue;
-  leds(3, 3) = CRGB::Blue;
-  leds(4, 4) = CRGB::Blue;
-  leds(5, 5) = CRGB::Blue;
-  leds(6, 6) = CRGB::Blue;
-  leds(7, 7) = CRGB::Blue;
-  leds(8, 7) = CRGB::Blue;
-  leds(9, 6) = CRGB::Blue;
-  leds(10, 5) = CRGB::Blue;
-  leds(11, 4) = CRGB::Blue;
-  leds(12, 3) = CRGB::Blue;
-  leds(13, 2) = CRGB::Blue;
-  leds(14, 1) = CRGB::Blue;
-  leds(15, 0) = CRGB::Blue;
-  leds(16, 0) = CRGB::Blue;
-  leds(17, 1) = CRGB::Blue;
-  leds(18, 2) = CRGB::Blue;
-  leds(19, 3) = CRGB::Blue;
-  leds(20, 4) = CRGB::Blue;
-  leds(21, 5) = CRGB::Blue;
-  leds(22, 6) = CRGB::Blue;
-  leds(23, 7) = CRGB::Blue;
-  leds(24, 7) = CRGB::Blue;
-  leds(25, 6) = CRGB::Blue;
-  leds(26, 5) = CRGB::Blue;
-  leds(27, 4) = CRGB::Blue;
-  leds(28, 3) = CRGB::Blue;
-  leds(29, 2) = CRGB::Blue;
-  leds(30, 1) = CRGB::Blue;
-  leds(31, 0) = CRGB::Blue;
+  colorPattern(CRGB::Blue);
   FastLED.show();
-  // FastLED.delay(1000);
-
-  // TODO: clear? maybe fade out will look better
-
-  // TODO: turn off onboard LED
+  // TODO: fastled.delay is sending refreshes too quickly and crashing
+  delay(2000);
 }
 
 void setupAudio() {
@@ -715,21 +627,23 @@ void mapSpreadOutputsToVisualizerMatrix() {
 void combineMatrixes() {
   // TODO: what should we do here? how should we overlay/interleave the different matrixes into one?
 
-  // TODO: for each x and y of the display matrix
-    // TODO: if text, display text
-    // TODO: else if sprite, display sprite
-    // TODO: else display visualizer
+  // TODO: this could probably be a lot more efficient
+  for (uint16_t x = 0; x < numLEDsX; x++) {
+    for (uint16_t y = 0; y < numLEDsY; y++) {
+      // TODO: if text, display text
+      // TODO: else if sprite, display sprite
+      // TODO: else display visualizer
+      uint16_t vis_x = x % visualizerNumLEDsX;
+      uint16_t vis_y = y % visualizerNumLEDsY;
+
+      leds(x, y) = visualizer_matrix(vis_x, vis_y);
+    }
+  }
 }
 
-bool sprites_drawn = false;
+bool new_visualizer_frame = false;
 
 void loop() {
-  if (!sprites_drawn) {
-    sprites_drawn = true;
-
-    // TODO: draw sprites or draw text
-  }
-
   if (fft1024.available()) {
     updateFrequencyColors();
 
@@ -738,17 +652,23 @@ void loop() {
     mapOutputsToSpreadOutputs();
     mapSpreadOutputsToVisualizerMatrix();
 
-    // TODO: render sprites
-    // TODO: render text
-
-    // combineMatrixes();
-
-    FastLED.show();
-
-    sprites_drawn = false;
+    new_visualizer_frame = true;
   }
 
-  // using FastLED's delay allows for dithering
-  // TODO: calculate the delay to get an even framerate now that show takes an uneven amount of time. (14-16ms)
-  FastLED.delay(1);
+  if (new_visualizer_frame && millis() - lastDraw >= 30) {
+    lastDraw = millis();
+
+    combineMatrixes();
+
+    FastLED.show();
+    new_visualizer_frame = false;
+
+    // TODO: draw the next frame for sprites/text
+
+    // using FastLED's delay allows for dithering
+    // TODO: calculate the delay to get an even framerate now that show takes an uneven amount of time. (14-16ms)
+    // TODO: fastled.delay is sending refreshes too quickly and crashing
+    delay(20);
+
+  }
 }
