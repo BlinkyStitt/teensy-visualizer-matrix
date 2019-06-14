@@ -18,15 +18,15 @@
 #include <Wire.h>
 
 #define VOLUME_KNOB A2
-#define MATRIX_FRONT_CLOCK_PIN 0  // yellow wire on my dotstars
-#define MATRIX_FRONT_DATA_PIN 1  // green wire on my dotstars
-#define MATRIX_BACK_CLOCK_PIN 2  // yellow wire on my dotstars
-#define MATRIX_BACK_DATA_PIN 3  // green wire on my dotstars
 #define SDCARD_CS_PIN 10
 #define SPI_MOSI_PIN 7  // alt pin for use with audio board
 #define RED_LED 13
 #define SPI_SCK_PIN 14  // alt pin for use with audio board
 // TODO: pin to check battery level?
+
+// TODO: MATRIX_CS_PIN if we plan on actually using the SD card
+#define MATRIX_CLOCK_PIN 0  // yellow wire on my dotstars
+#define MATRIX_DATA_PIN 1  // green wire on my dotstars
 
 #define LED_CHIPSET APA102
 #define LED_MODE BGR
@@ -43,7 +43,7 @@ const uint numFreqBands = 8;  // this will grow/shrink to fit inside numOutput. 
 
 // the shortest amount of time to leave an output on
 // TODO: tune this!
-const uint minOnMs = 337; // 118? 150? 184? 200? 250?
+const uint minOnMs = 250; // 118? 150? 184? 200? 250? 337?
 
 const uint16_t numLEDsX = 64; // TODO: might need to drop this to 32 and have 2 sets of pins
 const uint16_t numLEDsY = 8;
@@ -53,9 +53,8 @@ const uint ledsPerSpreadOutput = 2;
 const uint numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
 // TODO: make sure numSpreadOutputs fits evenly inside numLEDsX
 
-// TO
-const uint16_t visualizerNumLEDsX = 16;
-const uint16_t visualizerNumLEDsY = numLEDsY;
+const uint16_t visualizerNumLEDsX = numSpreadOutputs;
+const uint16_t visualizerNumLEDsY = numLEDsY / 2;
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 
 uint freqBands[numFreqBands];
@@ -84,9 +83,9 @@ cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
 // slide the leds over 1 every X frames
 // TODO: tune this now that the LEDs are denser. this might be way too fast
 const float seconds_for_full_rotation = 40.0;
-const float ms_per_frame = 11.5;  //was 11.5 with less LEDs  // don't touch this. this is set by the audio processing
+const float ms_per_frame = 11;  //was 11.5 with less LEDs  // don't touch this. this is set by the audio processing
 // 0.5 is added for rounding up
-const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / (2.0 * numLEDsX) / ms_per_frame + 0.5);
+const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / (2.0 * numLEDsX) / float(ms_per_frame) + 0.5);
 
 // how close a sound has to be to the loudest sound in order to activate
 const float activate_difference = 0.98;
@@ -114,7 +113,7 @@ AudioControlSGTL5000 audioShield; // xy=366,225
 
 // we don't want all the levels to be on at once
 // TODO: change this now that we are connected to a matrix
-const uint maxOn = numOutputs * 3 / 4;
+const uint maxOn = 5;  // numOutputs * 3 / 4;
 uint numOn = 0;
 
 // keep track of the max volume for each frequency band (slowly decays)
@@ -205,8 +204,6 @@ void setupSD() {
   // slave select pin for SPI
   pinMode(SDCARD_CS_PIN, OUTPUT);
 
-  SPI.begin(); // should this be here?
-
   // read values from the SD card using IniFile
 }
 
@@ -221,12 +218,12 @@ void setupLights() {
   // TODO: turn off onboard LED
   // TODO: clock select pin for FastLED to OUTPUT like we do for the SDCARD?
 
-  // for one panel, 2mhz worked. when a second panel was added, 2mhz crashed after a few seconds, but 1mhz is working on my test code 
-  FastLED.addLeds<LED_CHIPSET, MATRIX_FRONT_DATA_PIN, MATRIX_FRONT_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(900)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
-  // FastLED.addLeds<LED_CHIPSET, MATRIX_BACK_DATA_PIN, MATRIX_BACK_CLOCK_PIN, LED_MODE, DATA_RATE_MHZ(2)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+  // with software spi, for one panel, 2mhz worked. when a second panel was added, 2mhz crashed after a few seconds, but 1mhz is working on my test code. crashed after a second or so though 
+  // 
+  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(500)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
 
   // TODO: what should this be set to? the flexible panels are much larger
-  // led max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
+  // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
   // FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 5 * 1000 * 2);
   FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 500);
 
@@ -247,21 +244,24 @@ void setupLights() {
 
   Serial.println("Showing red...");
   colorPattern(CRGB::Red);
-  FastLED.show();
   // TODO: fastled.delay is sending refreshes too quickly and crashing
-  delay(2000);
+  // FastLED.show();
+  // delay(1500);
+  FastLED.delay(1500);
 
   Serial.println("Showing green...");
   colorPattern(CRGB::Green);
-  FastLED.show();
   // TODO: fastled.delay is sending refreshes too quickly and crashing
-  delay(2000);
+  // FastLED.show();
+  // delay(1500);
+  FastLED.delay(1500);
 
   Serial.println("Showing blue...");
   colorPattern(CRGB::Blue);
-  FastLED.show();
   // TODO: fastled.delay is sending refreshes too quickly and crashing
-  delay(2000);
+  // FastLED.show();
+  // delay(1500);
+  FastLED.delay(1500);
 }
 
 void setupAudio() {
@@ -302,12 +302,11 @@ void setup() {
   SPI.setMOSI(SPI_MOSI_PIN);
   SPI.setSCK(SPI_SCK_PIN);
 
+  SPI.begin(); // should this be here?
+
   setupSD();
 
-  // TODO: read SD card here to configure things
-
-  // TODO: read numOutputs from the SD card
-
+  // right now, once we setup the lights, we can't use the SD card anymore
   setupLights();
 
   setupAudio();
@@ -632,18 +631,27 @@ void combineMatrixes() {
     for (uint16_t y = 0; y < numLEDsY; y++) {
       // TODO: if text, display text
       // TODO: else if sprite, display sprite
-      // TODO: else display visualizer
-      uint16_t vis_x = x % visualizerNumLEDsX;
-      uint16_t vis_y = y % visualizerNumLEDsY;
-
-      leds(x, y) = visualizer_matrix(vis_x, vis_y);
+      // TODO: else display visualizer (wrapping on the x axis)
+      // TODO: do more interesting things with y. maybe set the middle of the array as the "bottom" and grow out
+      if (y < visualizerNumLEDsY) {
+        uint16_t vis_x = x % visualizerNumLEDsX;
+        uint16_t vis_y = y % visualizerNumLEDsY;
+        leds(x, y) = visualizer_matrix(vis_x, vis_y);
+      } else {
+        leds(x, y) = CRGB::Black;
+      }
     }
   }
 }
 
-bool new_visualizer_frame = false;
+bool new_frame = false;
+bool new_sprite_frame = false;
+
+unsigned long loop_duration = 0;
 
 void loop() {
+  loop_duration = millis();
+
   if (fft1024.available()) {
     updateFrequencyColors();
 
@@ -652,23 +660,29 @@ void loop() {
     mapOutputsToSpreadOutputs();
     mapSpreadOutputsToVisualizerMatrix();
 
-    new_visualizer_frame = true;
+    new_frame = true;
   }
 
-  if (new_visualizer_frame && millis() - lastDraw >= 30) {
-    lastDraw = millis();
+  // TODO: draw text/sprites and set new_frame=true
 
+  if (new_frame) {
+    // TODO: time this
     combineMatrixes();
 
-    FastLED.show();
-    new_visualizer_frame = false;
+    new_frame = false;
 
-    // TODO: draw the next frame for sprites/text
-
-    // using FastLED's delay allows for dithering
-    // TODO: calculate the delay to get an even framerate now that show takes an uneven amount of time. (14-16ms)
-    // TODO: fastled.delay is sending refreshes too quickly and crashing
-    delay(20);
-
+    loop_duration = millis() - loop_duration;
+    if (loop_duration < ms_per_frame) {
+      // using FastLED's delay allows for dithering
+      // TODO: calculate the delay to get an even framerate now that show takes an uneven amount of time. (13-15ms)
+      // TODO: with software spi, fastled.delay was sending refreshes too quickly and crashing. try with hardware
+      // FastLED.delay(ms_per_frame - loop_duration);
+      FastLED.show();
+      delay(ms_per_frame - loop_duration);
+    } else {
+      Serial.print("Running slow! ");
+      Serial.println(loop_duration);
+      FastLED.show();
+    }
   }
 }

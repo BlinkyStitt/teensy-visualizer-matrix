@@ -2,9 +2,6 @@
 #define DEBUG_SERIAL_WAIT
 #include "bs_debug.h"
 
-// TODO: not sure about this
-// #define FASTLED_ALLOW_INTERRUPTS 0
-
 #include <stdlib.h>
 
 #include <Audio.h>
@@ -18,15 +15,16 @@
 #include <Wire.h>
 
 #define VOLUME_KNOB A2
-#define MATRIX_FRONT_CLOCK_PIN 0  // yellow wire on my dotstars
-#define MATRIX_FRONT_DATA_PIN 1  // green wire on my dotstars
-#define MATRIX_BACK_CLOCK_PIN 2  // yellow wire on my dotstars
-#define MATRIX_BACK_DATA_PIN 3  // green wire on my dotstars
 #define SDCARD_CS_PIN 10
-#define SPI_MOSI_PIN 7  // alt pin for use with audio board
+#define SPI_MOSI_PIN 7  // alt pin for use with audio board (which is using 11)
 #define RED_LED 13
-#define SPI_SCK_PIN 14  // alt pin for use with audio board
+#define SPI_SCK_PIN 14  // alt pin for use with audio board (which is using 13)
 // TODO: pin to check battery level?
+
+// TODO: software spi is causing problems. switch to hardware pins (which we only have one of!)
+#define MATRIX_CLOCK_PIN SPI_MOSI_PIN  // yellow wire on my dotstars
+#define MATRIX_DATA_PIN SPI_SCK_PIN  // green wire on my dotstars
+// TODO: MATRIX_CS_PIN and hardware so that we can access the SD without making the lights go crazy
 
 #define LED_CHIPSET APA102
 #define LED_MODE BGR
@@ -85,8 +83,7 @@ void setupLights() {
 
   // TODO: clock select pin for FastLED to OUTPUT like we do for the SDCARD?
   // TODO: find maximum data rate and then ", DATA_RATE_MHZ(12)"
-  FastLED.addLeds<LED_CHIPSET, MATRIX_FRONT_DATA_PIN, MATRIX_FRONT_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(10)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
-  // FastLED.addLeds<LED_CHIPSET, MATRIX_BACK_DATA_PIN, MATRIX_BACK_CLOCK_PIN, LED_MODE, DATA_RATE_MHZ(12)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+  FastLED.addLeds<LED_CHIPSET, SPI_MOSI_PIN, SPI_SCK_PIN, LED_MODE, DATA_RATE_KHZ(800)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
 
   // TODO: what should this be set to? the flexible panels are much larger
   // led max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
@@ -121,33 +118,37 @@ void setup() {
 }
 
 void colorPattern(CRGB::HTMLColorCode color) {
+  uint16_t y = 0;
   for (uint16_t x = 0; x < numLEDsX; x++) {
-    uint16_t y_0 = x % numLEDsY;
-    leds(x, y_0) = color;
+    y = x % numLEDsY;
+    leds(x, y) = color;
 
-    uint16_t y_1 = (x + 1) % numLEDsY;
-    if (y_1 % 1 == 0) {
-      leds(x, y_1) = color;
-    }
+    y = (x + 2) % numLEDsY;
+    leds(x, y) = color;
+
+    // y = (x + 4) % numLEDsY;
+    // if (y % 2 == 0) {
+    //   leds(x, y) = color;
+    // }
   }
 }
 
 void loop() {
   Serial.println("Showing red...");
   colorPattern(CRGB::Red);
-  // FastLED.delay(2000);
-  FastLED.show();
-  delay(2000);
+  FastLED.delay(2000);
+  // FastLED.show();
+  // delay(2000);
 
   Serial.println("Showing green...");
   colorPattern(CRGB::Green);
-  // FastLED.delay(2000);
-  FastLED.show();
-  delay(2000);
+  FastLED.delay(2000);
+  // FastLED.show();
+  // delay(2000);
 
   Serial.println("Showing blue...");
   colorPattern(CRGB::Blue);
-  // FastLED.delay(2000);
-  FastLED.show();
-  delay(2000);
+  FastLED.delay(2000);
+  // FastLED.show();
+  // delay(2000);
 }
