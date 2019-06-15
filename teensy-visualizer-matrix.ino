@@ -45,13 +45,13 @@ const uint numFreqBands = numOutputs;  // this will grow/shrink to fit inside nu
 // it will stay on longer than this depending on time required to dim to off
 // https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
 // "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
-const uint minOnMs = 1000 / 4; // 118? 150? 169? 184? 200? 250? 337?
+const uint minOnMs = 1000 / 5; // 118? 150? 169? 184? 200? 250? 337?
 
 const uint16_t numLEDsX = 64; // TODO: might need to drop this to 32 and have 2 sets of pins
 const uint16_t numLEDsY = 8;
 
 // TODO: spread used to mean turn multiple on. now i want it to be a gap
-const uint ledsPerSpreadOutput = 4;
+const uint ledsPerSpreadOutput = 2;
 const uint numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
 // TODO: make sure numSpreadOutputs fits evenly inside numLEDsX
 
@@ -60,14 +60,14 @@ const uint16_t visualizerNumLEDsY = numLEDsY; // this is one way to keep power d
 
 // slide the leds over 1 every X frames
 // TODO: tune this now that the LEDs are denser. this might be way too fast
-const float seconds_for_full_rotation = 33.3;
+const float seconds_for_full_rotation = 20;
 const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 // 0.5 is added for rounding up
 const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / numLEDsX / float(ms_per_frame) + 0.5);
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved
-const float activate_difference = 0.70;
+const float activate_difference = 0.75;
 // simple % decrease
 const float decayMax = 0.98;  // was .98
 // set a floor so that decayMax doesn't go too low
@@ -76,11 +76,11 @@ const float minMaxLevel = 0.15 / activate_difference;
 // how much of the neighbor's max to consider when deciding when to turn on
 const float scale_neighbor_max = 0.9;
 // how much of all the other bin's max to consider when deciding when to turn on
-const float scale_overall_max = activate_difference;
+const float scale_overall_max = 0.5;
 // TODO: not sure i like how this works
 const uint value_min = 32;
 // how quickly to fade to black
-const uint fade_factor = 3;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
+const uint fade_factor = 6;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
 
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 
