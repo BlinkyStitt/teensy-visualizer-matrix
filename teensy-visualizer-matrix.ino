@@ -41,15 +41,17 @@ const uint maxBin = 373; // skip over 16kHz
 const uint numOutputs = 8; // this needs to fit into a 64 wide matrix
 const uint numFreqBands = numOutputs;  // this will grow/shrink to fit inside numOutput. TODO: what should this be? maybe just do 8
 
-// the shortest amount of time to leave an output on
-// TODO: tune this!
-const uint minOnMs = 100; // 118? 150? 184? 200? 250? 337?
+// the shortest amount of time to leave an output on before starting to dim it
+// it will stay on longer than this depending on time required to dim to off
+// https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
+// "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
+const uint minOnMs = 1000 / 4; // 118? 150? 169? 184? 200? 250? 337?
 
 const uint16_t numLEDsX = 64; // TODO: might need to drop this to 32 and have 2 sets of pins
 const uint16_t numLEDsY = 8;
 
 // TODO: spread used to mean turn multiple on. now i want it to be a gap
-const uint ledsPerSpreadOutput = 2;
+const uint ledsPerSpreadOutput = 4;
 const uint numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
 // TODO: make sure numSpreadOutputs fits evenly inside numLEDsX
 
@@ -58,26 +60,27 @@ const uint16_t visualizerNumLEDsY = numLEDsY; // this is one way to keep power d
 
 // slide the leds over 1 every X frames
 // TODO: tune this now that the LEDs are denser. this might be way too fast
-const float seconds_for_full_rotation = 42;
+const float seconds_for_full_rotation = 33.3;
 const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 // 0.5 is added for rounding up
-const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / (2.0 * numLEDsX) / float(ms_per_frame) + 0.5);
+const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / numLEDsX / float(ms_per_frame) + 0.5);
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved
-const float activate_difference = 0.80;
+const float activate_difference = 0.70;
 // simple % decrease
-const float decayMax = 0.99;  // was 98
+const float decayMax = 0.98;  // was .98
 // set a floor so that decayMax doesn't go too low
 const float minMaxLevel = 0.15 / activate_difference;
 
 // how much of the neighbor's max to consider when deciding when to turn on
 const float scale_neighbor_max = 0.9;
 // how much of all the other bin's max to consider when deciding when to turn on
-const float scale_overall_max = 0.616;
+const float scale_overall_max = activate_difference;
+// TODO: not sure i like how this works
+const uint value_min = 32;
 // how quickly to fade to black
-const uint value_min = 25;
-const uint fade_factor = 4;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
+const uint fade_factor = 3;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
 
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 
@@ -401,12 +404,6 @@ void updateFrequencyColors() {
     if (currentLevel[i] < local_max * activate_difference) {
       // the output should be off
 
-      // reduce the brightness at 2x the rate we reduce max level
-      // we were using "video" scaling to fade (meaning: never fading to full black), but CHSV doesn't have a fadeLightBy method
-      // frequencyColors[i].fadeLightBy(int((1.0 - decayMax) * 4.0 * 255));
-      // TODO: should the brightness be tied to the currentLevel somehow? that might make it too random looking but now that we have better height calculations, maybe it should
-      frequencyColors[i].value *= decayMax;
-
       if (millis() < turnOffMsArray[i]) {
         // the output has not been on for long enough to prevent flicker
         // make sure we don't turn off while fading
@@ -417,7 +414,14 @@ void updateFrequencyColors() {
       } else {
         // the output has been on for at least minOnMs and is quiet now
         // if it is on, dim it quickly to off
-        frequencyColors[i].value *= decayMax;
+
+        // reduce the brightness at 2x the rate we reduce max level
+        // we were using "video" scaling to fade (meaning: never fading to full black), but CHSV doesn't have a fadeLightBy method
+        // frequencyColors[i].fadeLightBy(int((1.0 - decayMax) * 4.0 * 255));
+        // TODO: should the brightness be tied to the currentLevel somehow? that might make it too random looking but now that we have better height calculations, maybe it should
+        // frequencyColors[i].value *= decayMax;
+        // frequencyColors[i].value *= decayMax;
+
         if (frequencyColors[i].value > fade_factor) {
           frequencyColors[i].value -= fade_factor;
         } else {
@@ -575,6 +579,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // shift increments each frame and is used to slowly modify the pattern
   // TODO: test this now that we are on a matrix
   // TODO: i don't like this shift method. it should fade the top pixel and work its way down, not dim the whole column evenly
+  // TODO: the top pixels are flickering a lot, too. maybe we need minOnMs here instead of earlier?
   static uint shift = 0;
 
   // TODO: should this be static?
@@ -616,7 +621,8 @@ void mapSpreadOutputsToVisualizerMatrix() {
         } else if (y == highestIndexToLight) {
           // the highest lit pixel will have a variable brightness to match the volume
           // TODO: tune this. we might want a more interesting curve. value_min night need to be a larger value to prevent flickering
-          new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, value_min, 255.0));
+          // TODO: i was using min on, but that needs to be a lower value
+          new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, 127.0, 255.0));
 
           visualizer_matrix(x, y) = new_color;
         } else {
