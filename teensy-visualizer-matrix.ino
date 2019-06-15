@@ -32,18 +32,18 @@
 #define LED_MODE BGR
 
 // TODO: use volume knob for setting brightness. a light sensor could maybe work
-#define DEFAULT_BRIGHTNESS 40 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
+#define DEFAULT_BRIGHTNESS 52 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
 
 // each frequencyBin = ~43Hz
 const uint minBin = 1;   // skip 0-43Hz. it's too noisy
 const uint maxBin = 373; // skip over 16kHz
 
 const uint numOutputs = 8; // this needs to fit into a 64 wide matrix
-const uint numFreqBands = 8;  // this will grow/shrink to fit inside numOutput. TODO: what should this be? maybe just do 8
+const uint numFreqBands = numOutputs;  // this will grow/shrink to fit inside numOutput. TODO: what should this be? maybe just do 8
 
 // the shortest amount of time to leave an output on
 // TODO: tune this!
-const uint minOnMs = 250; // 118? 150? 184? 200? 250? 337?
+const uint minOnMs = 200; // 118? 150? 184? 200? 250? 337?
 
 const uint16_t numLEDsX = 64; // TODO: might need to drop this to 32 and have 2 sets of pins
 const uint16_t numLEDsY = 8;
@@ -54,7 +54,8 @@ const uint numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
 // TODO: make sure numSpreadOutputs fits evenly inside numLEDsX
 
 const uint16_t visualizerNumLEDsX = numSpreadOutputs;
-const uint16_t visualizerNumLEDsY = numLEDsY / 2;
+const uint16_t visualizerNumLEDsY = numLEDsY; // this is one way to keep power down
+
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 
 uint freqBands[numFreqBands];
@@ -82,8 +83,8 @@ cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
 
 // slide the leds over 1 every X frames
 // TODO: tune this now that the LEDs are denser. this might be way too fast
-const float seconds_for_full_rotation = 40.0;
-const float ms_per_frame = 11;  //was 11.5 with less LEDs  // don't touch this. this is set by the audio processing
+const float seconds_for_full_rotation = 90;
+const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 // 0.5 is added for rounding up
 const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / (2.0 * numLEDsX) / float(ms_per_frame) + 0.5);
 
@@ -102,7 +103,7 @@ const float scale_overall_max = 0.4;
 const float scale_neighbor_brightness = 1.1;
 // how quickly to fade to black
 const uint value_min = 25;
-const uint fade_factor = 6;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
+const uint fade_factor = 8;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
 
 AudioInputI2S i2s1;  // xy=139,91
 AudioOutputI2S i2s2; // xy=392,32
@@ -113,7 +114,7 @@ AudioControlSGTL5000 audioShield; // xy=366,225
 
 // we don't want all the levels to be on at once
 // TODO: change this now that we are connected to a matrix
-const uint maxOn = 5;  // numOutputs * 3 / 4;
+const uint maxOn = numOutputs * 3 / 4;
 uint numOn = 0;
 
 // keep track of the max volume for each frequency band (slowly decays)
@@ -214,20 +215,22 @@ void colorPattern(CRGB::HTMLColorCode color) {
   }
 }
 
+unsigned long draw_ms = 10;
+
 void setupLights() {
   // TODO: turn off onboard LED
   // TODO: clock select pin for FastLED to OUTPUT like we do for the SDCARD?
 
   // with software spi, for one panel, 2mhz worked. when a second panel was added, 2mhz crashed after a few seconds, but 1mhz is working on my test code. crashed after a second or so though 
-  // 
-  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(500)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+  // looks like 500 mhz can run 2 panels, but we are having power troubles now. more power might mean we can increase the rate
+  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(1500)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
 
   // TODO: what should this be set to? the flexible panels are much larger
   // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
   // FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 5 * 1000 * 2);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 500);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 180); // when running through teensy's usb port, the max draw is much lower than with a battery
 
-  FastLED.setBrightness(DEFAULT_BRIGHTNESS); // TODO: read this from the SD card
+  FastLED.setBrightness(DEFAULT_BRIGHTNESS); // TODO: read this from the SD card. or allow tuning with the volume knob
 
   // clear all the arrays
   for (uint i = 0; i < numFreqBands; i++) {
@@ -247,21 +250,31 @@ void setupLights() {
   // TODO: fastled.delay is sending refreshes too quickly and crashing
   // FastLED.show();
   // delay(1500);
-  FastLED.delay(1500);
+
+  // time FastLED.show so we can delay the right amount in our main loop
+  draw_ms = millis();
+  FastLED.show();
+  draw_ms = millis() - draw_ms;
+
+  Serial.print("Draw time: ");
+  Serial.print(draw_ms);
+  Serial.println("ms");
+
+  FastLED.delay(2000);
 
   Serial.println("Showing green...");
   colorPattern(CRGB::Green);
   // TODO: fastled.delay is sending refreshes too quickly and crashing
   // FastLED.show();
   // delay(1500);
-  FastLED.delay(1500);
+  FastLED.delay(2000);
 
   Serial.println("Showing blue...");
   colorPattern(CRGB::Blue);
   // TODO: fastled.delay is sending refreshes too quickly and crashing
   // FastLED.show();
   // delay(1500);
-  FastLED.delay(1500);
+  FastLED.delay(2000);
 }
 
 void setupAudio() {
@@ -388,16 +401,16 @@ void updateFrequencyColors() {
     // TODO: i'm not sure i like this method anymore. its too arbitrary
     if (currentLevel[i] < local_max * activate_difference) {
       // the output should be off
+
+      // reduce the brightness at 2x the rate we reduce max level
+      // we were using "video" scaling to fade (meaning: never fading to full black), but CHSV doesn't have a fadeLightBy method
+      // frequencyColors[i].fadeLightBy(int((1.0 - decayMax) * 4.0 * 255));
+      // TODO: should the brightness be tied to the currentLevel somehow? that might make it too random looking
+      frequencyColors[i].value *= decayMax;
+      frequencyColors[i].value *= decayMax;
+
       if (millis() < turnOffMsArray[i]) {
         // the output has not been on for long enough to prevent flicker
-        // leave it on but reduce brightness at 2x the rate we reduce maxLevel
-        // TODO: should the brightness be tied to the currentLevel somehow? that might make it too random looking
-        // we were using "video" scaling to fade (meaning: never fading to full black), but CHSV doesn't have a fadeLightBy method
-        // frequencyColors[i].fadeLightBy(int((1.0 - decayMax) * 4.0 * 255));
-
-        frequencyColors[i].value *= decayMax;
-        frequencyColors[i].value *= decayMax;
-
         // make sure we don't turn off while fading
         // TODO: tune this minimum?
         if (frequencyColors[i].value < 1) {
@@ -607,8 +620,9 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
           visualizer_matrix(x, y) = new_color;
         } else {
-          // TODO: this is probably going to make animated text and sprites look blurry
-          visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
+          // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
+          visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
+          // visualizer_matrix(x, y) = CRGB::Black;
         }
       }
     } else {
@@ -616,6 +630,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // TODO: this is probably going to make animated text and sprites look blurry
       for (uint y = 0; y < numLEDsY; y++) {
         visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
+        // visualizer_matrix(x, y) = CRGB::Black;
       }
     }
   }
@@ -676,9 +691,11 @@ void loop() {
       // using FastLED's delay allows for dithering
       // TODO: calculate the delay to get an even framerate now that show takes an uneven amount of time. (13-15ms)
       // TODO: with software spi, fastled.delay was sending refreshes too quickly and crashing. try with hardware
-      // FastLED.delay(ms_per_frame - loop_duration);
-      FastLED.show();
-      delay(ms_per_frame - loop_duration);
+      // delay calls FastLED.show multiple times. since we had to reduce bandwidth, this takes time that we subtract from our delay
+      long delay = ms_per_frame - loop_duration - draw_ms;
+      FastLED.delay(delay);
+
+      // TODO: use a regular delay here to keep the framerate slower?
     } else {
       Serial.print("Running slow! ");
       Serial.println(loop_duration);
