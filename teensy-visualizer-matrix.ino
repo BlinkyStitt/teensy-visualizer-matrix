@@ -58,7 +58,7 @@ const uint16_t visualizerNumLEDsY = numLEDsY; // this is one way to keep power d
 
 // slide the leds over 1 every X frames
 // TODO: tune this now that the LEDs are denser. this might be way too fast
-const float seconds_for_full_rotation = 69;
+const float seconds_for_full_rotation = 42;
 const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 // 0.5 is added for rounding up
 const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / (2.0 * numLEDsX) / float(ms_per_frame) + 0.5);
