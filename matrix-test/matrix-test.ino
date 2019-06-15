@@ -42,7 +42,7 @@ const uint16_t numLEDsX = 64;
 const uint16_t numLEDsY = 8;
 
 // TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive
-// TODO: we might want negative for Y, but using uint is breaking that
+// TODO: we might want negative for Y, but using uint16_t is breaking that
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
 
 void setupSD() {

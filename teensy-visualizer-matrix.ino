@@ -35,56 +35,57 @@
 #define DEFAULT_BRIGHTNESS 52 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
 
 // each frequencyBin = ~43Hz
-const uint minBin = 1;   // skip 0-43Hz. it's too noisy
-const uint maxBin = 373; // skip over 16kHz
+const uint16_t minBin = 1;   // skip 0-43Hz. it's too noisy
+const uint16_t maxBin = 373; // skip over 16kHz
 
-const uint numOutputs = 8; // this needs to fit into a 64 wide matrix
-const uint numFreqBands = numOutputs;  // this will grow/shrink to fit inside numOutput. TODO: what should this be? maybe just do 8
+const uint8_t numOutputs = 8; // this needs to fit into a 64 wide matrix
+const uint8_t numFreqBands = numOutputs;  // this will grow/shrink to fit inside numOutput. TODO: what should this be? maybe just do 8
+
+const uint8_t numLEDsX = 64;
+const uint8_t numLEDsY = 8;
+
+const uint8_t ledsPerSpreadOutput = 2;
+const uint8_t numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
+// TODO: make sure numSpreadOutputs fits evenly inside numLEDsX
+
+const uint8_t visualizerNumLEDsX = numSpreadOutputs;
+const uint8_t visualizerNumLEDsY = numLEDsY; // this is one way to keep power down
+
+// slide the leds over 1 every X frames
+// TODO: tune this now that the LEDs are denser. this might be way too fast
+const float seconds_for_full_rotation = 50.0;
+const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 
 // the shortest amount of time to leave an output on before starting to dim it
 // it will stay on longer than this depending on time required to dim to off
 // https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
 // "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
-const uint minOnMs = 1000 / 5; // 118? 150? 169? 184? 200? 250? 337?
+const uint16_t minOnMs = 1000.0 / 4.2; // 118? 150? 169? 184? 200? 250? 337?
+// TODO: round minOnMs to be a multiple of ms_per_frame
 
-const uint16_t numLEDsX = 64; // TODO: might need to drop this to 32 and have 2 sets of pins
-const uint16_t numLEDsY = 8;
-
-// TODO: spread used to mean turn multiple on. now i want it to be a gap
-const uint ledsPerSpreadOutput = 2;
-const uint numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
-// TODO: make sure numSpreadOutputs fits evenly inside numLEDsX
-
-const uint16_t visualizerNumLEDsX = numSpreadOutputs;
-const uint16_t visualizerNumLEDsY = numLEDsY; // this is one way to keep power down
-
-// slide the leds over 1 every X frames
-// TODO: tune this now that the LEDs are denser. this might be way too fast
-const float seconds_for_full_rotation = 20;
-const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 // 0.5 is added for rounding up
-const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / numLEDsX / float(ms_per_frame) + 0.5);
+const uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX) / ms_per_frame) + 0.5;
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved
-const float activate_difference = 0.75;
+const float activate_difference = 6.0/8.0;
 // simple % decrease
 const float decayMax = 0.98;  // was .98
 // set a floor so that decayMax doesn't go too low
-const float minMaxLevel = 0.15 / activate_difference;
+const float minMaxLevel = 0.16 / activate_difference;
 
 // how much of the neighbor's max to consider when deciding when to turn on
 const float scale_neighbor_max = 0.9;
 // how much of all the other bin's max to consider when deciding when to turn on
 const float scale_overall_max = 0.5;
 // TODO: not sure i like how this works
-const uint value_min = 32;
+const uint8_t value_min = 32;
 // how quickly to fade to black
-const uint fade_factor = 6;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
+const uint8_t fade_factor = 5;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
 
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 
-uint freqBands[numFreqBands];
+uint8_t freqBands[numFreqBands];
 CHSV frequencyColors[numFreqBands];
 
 // frequencyColors are stretched/squished to fit this (squishing being what you probably want)
@@ -96,7 +97,7 @@ CHSV outputs[numOutputs];
 CHSV outputsStretched[numSpreadOutputs];
 
 // TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive
-// TODO: we might want negative for Y, but using uint is breaking that
+// TODO: we might want negative for Y, but using uint16_t is breaking that
 cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
 
 // because of how we fade the visualizer slowly, we need to have a seperate matrix for the sprites and text
@@ -116,8 +117,8 @@ AudioControlSGTL5000 audioShield; // xy=366,225
 
 // we don't want all the levels to be on at once
 // TODO: change this now that we are connected to a matrix
-const uint maxOn = numOutputs * 3 / 4;
-uint numOn = 0;
+const uint8_t maxOn = numOutputs * 3 / 4;
+uint8_t numOn = 0;
 
 // keep track of the max volume for each frequency band (slowly decays)
 float maxLevel[numFreqBands];
@@ -139,21 +140,21 @@ unsigned long lastDraw = 0;
  * with help from https://phoxis.org/2012/07/12/get-sorted-index-orderting-of-an-array/
  */
 static int compare_levels(const void *a, const void *b) {
-  // TODO: check for uint to int overflow issues
+  // TODO: check for uint16_t to int overflow issues
   int aa = *((int *)a), bb = *((int *)b);
   return (currentLevel[bb] / maxLevel[bb]) - (currentLevel[aa] / maxLevel[aa]);
 }
 
-float FindE(uint bands, uint minBin, uint maxBin) {
+float FindE(uint16_t bands, uint16_t minBin, uint16_t maxBin) {
   // https://forum.pjrc.com/threads/32677-Is-there-a-logarithmic-function-for-FFT-bin-selection-for-any-given-of-bands?p=133842&viewfull=1#post133842
   float increment = 0.1, eTest, n;
-  uint b, count, d;
+  uint16_t b, count, d;
 
   for (eTest = 1; eTest < maxBin; eTest += increment) { // Find E through brute force calculations
     count = minBin;
     for (b = 0; b < bands; b++) { // Calculate full log values
       n = pow(eTest, b);
-      d = uint(n + 0.5);
+      d = n + 0.5;  // round up
       count += d;
     }
 
@@ -175,16 +176,16 @@ float FindE(uint bands, uint minBin, uint maxBin) {
 void setupFFTBins() {
   // https://forum.pjrc.com/threads/32677-Is-there-a-logarithmic-function-for-FFT-bin-selection-for-any-given-of-bands?p=133842&viewfull=1#post133842
   float e, n;
-  uint count = minBin, d;
+  uint16_t count = minBin, d;
 
   e = FindE(numFreqBands, minBin, maxBin); // Find calculated E value
 
   if (e) {                           // If a value was returned continue
     Serial.printf("E = %4.4f\n", e); // Print calculated E value
     Serial.printf("  i  low high\n");
-    for (uint b = 0; b < numFreqBands; b++) { // Test and print the bins from the calculated E
+    for (uint16_t b = 0; b < numFreqBands; b++) { // Test and print the bins from the calculated E
       n = pow(e, b);
-      d = int(n + 0.5);
+      d = n + 0.5;
 
       Serial.printf("%3d ", b);
 
@@ -211,8 +212,8 @@ void setupSD() {
 }
 
 void colorPattern(CRGB::HTMLColorCode color) {
-  for (uint16_t x = 0; x < numLEDsX; x++) {
-    uint16_t y = x % numLEDsY;
+  for (uint8_t x = 0; x < numLEDsX; x++) {
+    uint8_t y = x % numLEDsY;
     leds(x, y) = color;
   }
 }
@@ -235,13 +236,13 @@ void setupLights() {
   FastLED.setBrightness(DEFAULT_BRIGHTNESS); // TODO: read this from the SD card. or allow tuning with the volume knob
 
   // clear all the arrays
-  for (uint i = 0; i < numFreqBands; i++) {
+  for (uint8_t i = 0; i < numFreqBands; i++) {
     frequencyColors[i].value = 0;
   }
-  for (uint i = 0; i < numOutputs; i++) {
+  for (uint8_t i = 0; i < numOutputs; i++) {
     outputs[i].value = 0;
   }
-  for (uint i = 0; i < numSpreadOutputs; i++) {
+  for (uint8_t i = 0; i < numSpreadOutputs; i++) {
     outputsStretched[i].value = 0;
   }
 
@@ -303,7 +304,7 @@ void setupAudio() {
   audioShield.unmuteHeadphone(); // for debugging
 
   // setup array for sorting
-  for (uint i = 0; i < numFreqBands; i++) {
+  for (uint16_t i = 0; i < numFreqBands; i++) {
     sortedLevelIndex[i] = i;
   }
 }
@@ -342,7 +343,7 @@ float updateLevelsFromFFT() {
 
   float overall_max = 0;
 
-  for (uint i = 0; i < numFreqBands - 1; i++) {
+  for (uint16_t i = 0; i < numFreqBands - 1; i++) {
     currentLevel[i] = fft1024.read(freqBands[i], freqBands[i + 1] - 1);
 
     if (currentLevel[i] > overall_max) {
@@ -356,7 +357,7 @@ float updateLevelsFromFFT() {
   return overall_max;
 }
 
-float getLocalMaxLevel(uint i, float scale_neighbor, float overall_max, float scale_overall_max) {
+float getLocalMaxLevel(uint16_t i, float scale_neighbor, float overall_max, float scale_overall_max) {
   float localMaxLevel = maxLevel[i];
 
   // check previous level if we aren't the first level
@@ -385,7 +386,7 @@ void updateFrequencyColors() {
 
   // turn off any quiet levels. we do this before turning any lights on so that our loudest frequencies are most
   // responsive
-  for (uint i = 0; i < numFreqBands; i++) {
+  for (uint16_t i = 0; i < numFreqBands; i++) {
     // update maxLevel
     // TODO: don't just track max. track the % change. then do something with stddev of neighbors?
     if (currentLevel[i] > maxLevel[i]) {
@@ -437,8 +438,8 @@ void updateFrequencyColors() {
   qsort(sortedLevelIndex, numFreqBands, sizeof(float), compare_levels);
 
   // turn on up to maxOn loud levels in order of loudest to quietest
-  for (uint j = 0; j < numFreqBands; j++) {
-    uint i = sortedLevelIndex[j];
+  for (uint16_t j = 0; j < numFreqBands; j++) {
+    uint16_t i = sortedLevelIndex[j];
 
     local_max = getLocalMaxLevel(i, scale_neighbor_max, overall_max, scale_overall_max);
 
@@ -460,7 +461,7 @@ void updateFrequencyColors() {
 
         // TODO: color-blind color pallete
         // map(value, fromLow, fromHigh, toLow, toHigh)
-        uint color_hue = map(i, 0, numFreqBands, 0, 255);
+        uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
         // use 255 as the max brightness. if that is too bright, FastLED.setBrightness can be changed in setup to reduce
         // what 255 does
 
@@ -468,7 +469,7 @@ void updateFrequencyColors() {
         // TODO: s-curve? i think FastLED actually does a curve for us
         // TODO: what should the min be? should we limit how fast it moves around by including frequencyColors[i].value here?
         // notie how we getLocalMax but exclude the overall volume. we only want that for on/off. if we include it here everything flickers too much
-        uint color_value = constrain(uint(currentLevel[i] / getLocalMaxLevel(i, scale_neighbor_max, 0, 0) * 255), value_min, uint(255));
+        uint8_t color_value = constrain(uint8_t(currentLevel[i] / getLocalMaxLevel(i, scale_neighbor_max, 0, 0) * 255), value_min, 255);
 
         // https://github.com/FastLED/FastLED/wiki/FastLED-HSV-Colors#color-map-rainbow-vs-spectrum
         // HSV makes it easy to cycle through the rainbow
@@ -494,7 +495,7 @@ void updateFrequencyColors() {
 
   // debug print
   // TODO: wrap this in an ifdef DEBUG
-  for (uint i = 0; i < numFreqBands; i++) {
+  for (uint16_t i = 0; i < numFreqBands; i++) {
     Serial.print("| ");
 
     // TODO: maybe do something with parity here? i think i don't have enough lights for that to matter at this point.
@@ -522,7 +523,7 @@ void updateFrequencyColors() {
 }
 
 void mapFrequencyColorsToOutputs() {
-  for (uint i = 0; i < numOutputs; i++) {
+  for (uint16_t i = 0; i < numOutputs; i++) {
     // numFreqBands can be bigger or smaller than numOutputs. a simple map like this works fine if numOutputs >
     // numFreqBands, but if not it skips some
     if (numOutputs == numFreqBands) {
@@ -535,12 +536,12 @@ void mapFrequencyColorsToOutputs() {
       // TODO: I don't think this is working
 
       // start by setting it to the first available band.
-      uint bottomFreqId = map(i, 0, numOutputs, 0, numFreqBands);
+      uint16_t bottomFreqId = map(i, 0, numOutputs, 0, numFreqBands);
 
       outputs[i] = frequencyColors[bottomFreqId];
 
-      uint topFreqId = map(i + 1, 0, numOutputs, 0, numFreqBands);
-      for (uint f = bottomFreqId + 1; f < topFreqId; f++) {
+      uint16_t topFreqId = map(i + 1, 0, numOutputs, 0, numFreqBands);
+      for (uint16_t f = bottomFreqId + 1; f < topFreqId; f++) {
         if (!frequencyColors[f].value) {
           // TODO: dim it some to represent neighbor being off?
           continue;
@@ -565,7 +566,7 @@ void mapFrequencyColorsToOutputs() {
 // TODO: args instead of globals
 void mapOutputsToSpreadOutputs() {
   // TODO: this seems really inefficient since a ton of spots will just be black. it makes the code simple though
-  for (uint i = 0; i < numSpreadOutputs; i += ledsPerSpreadOutput) {
+  for (uint16_t i = 0; i < numSpreadOutputs; i += ledsPerSpreadOutput) {
     outputsStretched[i] = outputs[i / ledsPerSpreadOutput];
   }
 }
@@ -580,13 +581,13 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // TODO: test this now that we are on a matrix
   // TODO: i don't like this shift method. it should fade the top pixel and work its way down, not dim the whole column evenly
   // TODO: the top pixels are flickering a lot, too. maybe we need minOnMs here instead of earlier?
-  static uint shift = 0;
+  static uint16_t shift = 0;
 
   // TODO: should this be static?
   static CHSV new_color;
 
-  for (uint x = 0; x < visualizerNumLEDsX; x++) {
-    uint shifted_x = (shift / frames_per_shift + x) % visualizerNumLEDsX;
+  for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
+    uint8_t shifted_x = (shift / frames_per_shift + x) % visualizerNumLEDsX;
 
     if (numSpreadOutputs == visualizerNumLEDsX) {
       new_color = outputsStretched[shifted_x];
@@ -607,24 +608,24 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // TODO: tune this. we might want a more interesting curve
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
       // notice that we do NOT use value_min for in_min on map. instead we use the actual range of the LED
-      float highestIndexToLight_f = map_float(new_color.value, 0, 255, 0, visualizerNumLEDsY);
+      uint8_t highestIndexToLight = map_float(new_color.value, value_min, 255, 3, visualizerNumLEDsY);
 
-      uint highestIndexToLight = uint(highestIndexToLight_f);
+      // uint8_t highestIndexToLight = highestIndexToLight_f;
 
       // we are using height instead of brightness to represent how loud the frequency was
       // so set to max brightness
       new_color.value = 255;
 
-      for (uint y = 0; y < visualizerNumLEDsY; y++) {
-        if (y < highestIndexToLight) {
+      for (uint8_t y=0; y < visualizerNumLEDsY; y++) {
+        if (y <= highestIndexToLight) {
           visualizer_matrix(x, y) = new_color;
-        } else if (y == highestIndexToLight) {
-          // the highest lit pixel will have a variable brightness to match the volume
-          // TODO: tune this. we might want a more interesting curve. value_min night need to be a larger value to prevent flickering
-          // TODO: i was using min on, but that needs to be a lower value
-          new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, 127.0, 255.0));
+        // } else if (y == highestIndexToLight) {
+        //   // the highest lit pixel will have a variable brightness to match the volume
+        //   // TODO: tune this. we might want a more interesting curve. value_min night need to be a larger value to prevent flickering
+        //   // TODO: i was using min on, but that needs to be a lower value
+        //   new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, 127.0, 255.0));
 
-          visualizer_matrix(x, y) = new_color;
+        //   visualizer_matrix(x, y) = new_color;
         } else {
           // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
           // visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
@@ -634,7 +635,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
     } else {
       // if new_color is black or close to it, we fade rather then set to black
       // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
-      for (uint y = 0; y < numLEDsY; y++) {
+      for (uint8_t y = 0; y < numLEDsY; y++) {
         // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
         visualizer_matrix(x, y) = CRGB::Black;
       }
