@@ -58,7 +58,7 @@ const uint16_t visualizerNumLEDsY = numLEDsY; // this is one way to keep power d
 
 // slide the leds over 1 every X frames
 // TODO: tune this now that the LEDs are denser. this might be way too fast
-const float seconds_for_full_rotation = 66.6;
+const float seconds_for_full_rotation = 69;
 const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 // 0.5 is added for rounding up
 const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / (2.0 * numLEDsX) / float(ms_per_frame) + 0.5);
@@ -94,7 +94,7 @@ CHSV outputsStretched[numSpreadOutputs];
 
 // TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive
 // TODO: we might want negative for Y, but using uint is breaking that
-cLEDMatrix<-visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
+cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
 
 // because of how we fade the visualizer slowly, we need to have a seperate matrix for the sprites and text
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> sprite_matrix;
