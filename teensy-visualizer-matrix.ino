@@ -43,7 +43,7 @@ const uint numFreqBands = numOutputs;  // this will grow/shrink to fit inside nu
 
 // the shortest amount of time to leave an output on
 // TODO: tune this!
-const uint minOnMs = 200; // 118? 150? 184? 200? 250? 337?
+const uint minOnMs = 100; // 118? 150? 184? 200? 250? 337?
 
 const uint16_t numLEDsX = 64; // TODO: might need to drop this to 32 and have 2 sets of pins
 const uint16_t numLEDsY = 8;
@@ -55,6 +55,29 @@ const uint numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
 
 const uint16_t visualizerNumLEDsX = numSpreadOutputs;
 const uint16_t visualizerNumLEDsY = numLEDsY; // this is one way to keep power down
+
+// slide the leds over 1 every X frames
+// TODO: tune this now that the LEDs are denser. this might be way too fast
+const float seconds_for_full_rotation = 66.6;
+const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
+// 0.5 is added for rounding up
+const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / (2.0 * numLEDsX) / float(ms_per_frame) + 0.5);
+
+// how close a sound has to be to the loudest sound in order to activate
+// TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved
+const float activate_difference = 0.80;
+// simple % decrease
+const float decayMax = 0.99;  // was 98
+// set a floor so that decayMax doesn't go too low
+const float minMaxLevel = 0.15 / activate_difference;
+
+// how much of the neighbor's max to consider when deciding when to turn on
+const float scale_neighbor_max = 0.9;
+// how much of all the other bin's max to consider when deciding when to turn on
+const float scale_overall_max = 0.616;
+// how quickly to fade to black
+const uint value_min = 25;
+const uint fade_factor = 4;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
 
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 
@@ -80,30 +103,6 @@ cLEDText ScrollingMsg;
 
 // the sprites and visualizer get combined into this
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
-
-// slide the leds over 1 every X frames
-// TODO: tune this now that the LEDs are denser. this might be way too fast
-const float seconds_for_full_rotation = 90;
-const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
-// 0.5 is added for rounding up
-const uint frames_per_shift = uint(seconds_for_full_rotation * 1000.0 / (2.0 * numLEDsX) / float(ms_per_frame) + 0.5);
-
-// how close a sound has to be to the loudest sound in order to activate
-const float activate_difference = 0.98;
-// simple % decrease
-const float decayMax = 0.98;
-// set a floor so that decayMax doesn't go too low
-const float minMaxLevel = 0.15 / activate_difference;
-
-// how much of the neighbor's max to consider when deciding when to turn on
-const float scale_neighbor_max = 0.9;
-// how much of all the other bin's max to consider when deciding when to turn on
-const float scale_overall_max = 0.4;
-// how much of the neighbor's max to consider when deciding how bright to be
-const float scale_neighbor_brightness = 1.1;
-// how quickly to fade to black
-const uint value_min = 25;
-const uint fade_factor = 8;  // was 16 on the hat. TODO: calculate this based on the framerate and a time to go from max to 0.
 
 AudioInputI2S i2s1;  // xy=139,91
 AudioOutputI2S i2s2; // xy=392,32
@@ -260,7 +259,7 @@ void setupLights() {
   Serial.print(draw_ms);
   Serial.println("ms");
 
-  FastLED.delay(2000);
+  FastLED.delay(2000 - draw_ms);
 
   Serial.println("Showing green...");
   colorPattern(CRGB::Green);
@@ -398,15 +397,14 @@ void updateFrequencyColors() {
     local_max = getLocalMaxLevel(i, scale_neighbor_max, overall_max, scale_overall_max);
 
     // turn off if current level is less than the activation threshold
-    // TODO: i'm not sure i like this method anymore. its too arbitrary
+    // TODO: i'm not sure i like this method anymore. now that we have a y-axis, we can show the true level (it bounces around wild though so will need smoothing)
     if (currentLevel[i] < local_max * activate_difference) {
       // the output should be off
 
       // reduce the brightness at 2x the rate we reduce max level
       // we were using "video" scaling to fade (meaning: never fading to full black), but CHSV doesn't have a fadeLightBy method
       // frequencyColors[i].fadeLightBy(int((1.0 - decayMax) * 4.0 * 255));
-      // TODO: should the brightness be tied to the currentLevel somehow? that might make it too random looking
-      frequencyColors[i].value *= decayMax;
+      // TODO: should the brightness be tied to the currentLevel somehow? that might make it too random looking but now that we have better height calculations, maybe it should
       frequencyColors[i].value *= decayMax;
 
       if (millis() < turnOffMsArray[i]) {
@@ -419,6 +417,7 @@ void updateFrequencyColors() {
       } else {
         // the output has been on for at least minOnMs and is quiet now
         // if it is on, dim it quickly to off
+        frequencyColors[i].value *= decayMax;
         if (frequencyColors[i].value > fade_factor) {
           frequencyColors[i].value -= fade_factor;
         } else {
@@ -455,6 +454,7 @@ void updateFrequencyColors() {
           numOn += 1;
         }
 
+        // TODO: color-blind color pallete
         // map(value, fromLow, fromHigh, toLow, toHigh)
         uint color_hue = map(i, 0, numFreqBands, 0, 255);
         // use 255 as the max brightness. if that is too bright, FastLED.setBrightness can be changed in setup to reduce
@@ -499,7 +499,6 @@ void updateFrequencyColors() {
     if (frequencyColors[i].value) {
       // Serial.print(leds[i].getLuma() / 255.0);
       // Serial.print(currentLevel[i]);
-      // Serial.print(currentLevel[i] / getLocalMaxLevel(i, scale_neighbor_brightness));
       Serial.print(frequencyColors[i].value / 255.0, 2);
     } else {
       Serial.print("    ");
@@ -575,6 +574,7 @@ float map_float(float x, float in_min, float in_max, float out_min, float out_ma
 void mapSpreadOutputsToVisualizerMatrix() {
   // shift increments each frame and is used to slowly modify the pattern
   // TODO: test this now that we are on a matrix
+  // TODO: i don't like this shift method. it should fade the top pixel and work its way down, not dim the whole column evenly
   static uint shift = 0;
 
   // TODO: should this be static?
@@ -621,16 +621,16 @@ void mapSpreadOutputsToVisualizerMatrix() {
           visualizer_matrix(x, y) = new_color;
         } else {
           // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
-          visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
-          // visualizer_matrix(x, y) = CRGB::Black;
+          // visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
+          visualizer_matrix(x, y) = CRGB::Black;
         }
       }
     } else {
       // if new_color is black or close to it, we fade rather then set to black
-      // TODO: this is probably going to make animated text and sprites look blurry
+      // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
       for (uint y = 0; y < numLEDsY; y++) {
-        visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
-        // visualizer_matrix(x, y) = CRGB::Black;
+        // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
+        visualizer_matrix(x, y) = CRGB::Black;
       }
     }
   }
