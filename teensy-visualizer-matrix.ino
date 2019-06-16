@@ -60,7 +60,8 @@ const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwi
 // it will stay on longer than this depending on time required to dim to off
 // https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
 // "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
-const uint16_t minOnMs = 1000.0 / 4.2; // 118? 150? 169? 184? 200? 250? 337?
+// 0.5 is added for rounding up
+const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 337?
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
 // 0.5 is added for rounding up
@@ -605,10 +606,9 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
     if (new_color.value >= value_min) {
       // use the value to calculate the height for this color
-      // TODO: tune this. we might want a more interesting curve
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
-      // notice that we do NOT use value_min for in_min on map. instead we use the actual range of the LED
-      uint8_t highestIndexToLight = map_float(new_color.value, value_min, 255, 3, visualizerNumLEDsY);
+      // TODO: tune this. we might want a more interesting curve. though i like the look of each light taking the same amount of time to turn offf
+      uint8_t highestIndexToLight = map(new_color.value, value_min, 255, 0, visualizerNumLEDsY);
 
       // uint8_t highestIndexToLight = highestIndexToLight_f;
 
@@ -619,12 +619,10 @@ void mapSpreadOutputsToVisualizerMatrix() {
       for (uint8_t y=0; y < visualizerNumLEDsY; y++) {
         if (y <= highestIndexToLight) {
           visualizer_matrix(x, y) = new_color;
+        // // TODO: this looked bad. the top light flickered way too much.
         // } else if (y == highestIndexToLight) {
         //   // the highest lit pixel will have a variable brightness to match the volume
-        //   // TODO: tune this. we might want a more interesting curve. value_min night need to be a larger value to prevent flickering
-        //   // TODO: i was using min on, but that needs to be a lower value
         //   new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, 127.0, 255.0));
-
         //   visualizer_matrix(x, y) = new_color;
         } else {
           // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
