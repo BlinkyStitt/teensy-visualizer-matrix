@@ -69,7 +69,7 @@ const uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(nu
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved
-const float activate_difference = 6.0/8.0;
+const float activate_difference = 4.0/8.0;
 // simple % decrease
 const float decayMax = 0.98;  // was .98
 // set a floor so that decayMax doesn't go too low
@@ -249,11 +249,10 @@ void setupLights() {
 
   FastLED.clear(true);
 
+  // show red, green, blue, so that we make sure LED_MODE is correct
+
   Serial.println("Showing red...");
   colorPattern(CRGB::Red);
-  // TODO: fastled.delay is sending refreshes too quickly and crashing
-  // FastLED.show();
-  // delay(1500);
 
   // time FastLED.show so we can delay the right amount in our main loop
   draw_ms = millis();
@@ -264,6 +263,7 @@ void setupLights() {
   Serial.print(draw_ms);
   Serial.println("ms");
 
+  // now delay for more time to make sure that fastled can power this many lights and update with this bandwidth
   FastLED.delay(2000 - draw_ms);
 
   Serial.println("Showing green...");
@@ -608,7 +608,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // use the value to calculate the height for this color
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
       // TODO: tune this. we might want a more interesting curve. though i like the look of each light taking the same amount of time to turn offf
-      uint8_t highestIndexToLight = map(new_color.value, value_min, 255, 0, visualizerNumLEDsY);
+      uint8_t highestIndexToLight = map(new_color.value, value_min, 255, 0, visualizerNumLEDsY - 1);
 
       // uint8_t highestIndexToLight = highestIndexToLight_f;
 
@@ -617,13 +617,14 @@ void mapSpreadOutputsToVisualizerMatrix() {
       new_color.value = 255;
 
       for (uint8_t y=0; y < visualizerNumLEDsY; y++) {
-        if (y <= highestIndexToLight) {
+        if (y < highestIndexToLight) {
           visualizer_matrix(x, y) = new_color;
+        } else if (y == highestIndexToLight) {
         // // TODO: this looked bad. the top light flickered way too much.
-        // } else if (y == highestIndexToLight) {
         //   // the highest lit pixel will have a variable brightness to match the volume
         //   new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, 127.0, 255.0));
         //   visualizer_matrix(x, y) = new_color;
+          visualizer_matrix(x, y) = CRGB::White;
         } else {
           // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
           // visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
