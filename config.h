@@ -49,18 +49,19 @@ const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 33
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
 // slide the leds over 1 every X frames
-// 0.5 is added for rounding up
-// const uint16_t ms_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX)) + 0.5;
-// uint16_t frames_per_shift = 1;  // LUDICROUS SPEED
-// uint16_t frames_per_shift = 2;  // HIGH SPEED
-uint16_t frames_per_shift = minOnMs / ms_per_frame + 0.5;    // maximum speed (no seizure speed)
-// float seconds_for_full_rotation = 42;
-// uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX) / ms_per_frame) + 0.5;  // 
+float seconds_for_slow_rotation = 42;
+uint16_t frames_per_shift[] = {
+  // maximum speed (no seizure speed)
+  minOnMs / ms_per_frame + 0.5,
+  // slow speed
+  (seconds_for_slow_rotation * 1000.0 / float(numLEDsX) / ms_per_frame) + 0.5,
+  // ludicrous speed
+  2,
+};
 
 // how close a sound has to be to the loudest sound in order to activate
-// TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved
 const float activate_difference = 4.5 / 8.0;
-// simple % decrease (TODO: rename this. it is how we fade to black, too. i think we should change this to )
+// simple % decrease
 const float decayMax = 0.99;  // was .98
 // TODO: not sure i like how this works. i want a more explicit link between this value and how long it takes to fade to black
 const uint8_t value_min = 32;

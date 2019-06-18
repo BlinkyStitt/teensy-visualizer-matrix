@@ -518,8 +518,8 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // TODO: i don't like this shift method. it should fade the top pixel and work its way down, not dim the whole column evenly
   // TODO: the top pixels are flickering a lot, too. maybe we need minOnMs here instead of earlier?
   static uint16_t shift = 0;
-  // static uint16_t // TODO: track frames_per_shift and only change shift if that has passed. this will let us change frames_per_shift while it runs
-
+  static uint16_t frames_since_last_shift = 0;
+  
   // TODO: should this be static?
   static CHSV new_color;
 
@@ -550,9 +550,9 @@ void mapSpreadOutputsToVisualizerMatrix() {
   }
 
   for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
-    // TODO: change the rate of frames_per_shift
+    // TODO: restructure this to change the rate of frames_per_shift.
     // we take the absolute value because shift might negative
-    uint8_t shifted_x = abs((x + shift / frames_per_shift) % visualizerNumLEDsX);
+    uint8_t shifted_x = abs((x + shift / frames_per_shift[0]) % visualizerNumLEDsX);
 
     if (numSpreadOutputs == visualizerNumLEDsX) {
       new_color = outputsStretched[shifted_x];
@@ -648,15 +648,11 @@ void mapSpreadOutputsToVisualizerMatrix() {
       }
 
       if (flip_shown[shifted_x]) {
+        // we used to have a mode that would toggle, but i like two modes more
         if (flip_mode == 0) {
           should_flip_y[shifted_x] = false;
-        // } else if (flip_mode == 1) {
-        //   should_flip_y[shifted_x] = !should_flip_y[shifted_x];
-        // } else if (flip_mode == 1) {
         } else {
           should_flip_y[shifted_x] = true;
-        // } else {
-        //   should_flip_y[shifted_x] = !should_flip_y[shifted_x];
         }
 
         flip_shown[shifted_x] = false;
