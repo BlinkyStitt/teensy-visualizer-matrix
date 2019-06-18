@@ -231,15 +231,16 @@ void setupAudio() {
   audioShield.volume(0.5);
   audioShield.micGain(60); // was 63, then 40  // 0-63 // TODO: tune this
 
-  //audioShield.audioPreProcessorEnable(); // todo: pre or post?
+  audioShield.audioPreProcessorEnable(); // todo: pre or post?
 
   // bass, mid_bass, midrange, mid_treble, treble
   // TODO: tune this. maybe read from SD card
-  //audioShield.eqSelect(GRAPHIC_EQUALIZER);
+  audioShield.eqSelect(GRAPHIC_EQUALIZER);
   // audioShield.eqBands(-0.80, -0.75, -0.50, 0.50, 0.80);  // the great northern
   // audioShield.eqBands(-0.5, -.2, 0, .2, .5);  // todo: tune this
   // audioShield.eqBands(-0.80, -0.10, 0, 0.10, 0.33);  // todo: tune this
   //audioShield.eqBands(0.0, 0.0, 0.0, 0.1, 0.33); // todo: tune this
+  audioShield.eqBands(0.2, 0.1, 0.0, 0.0, 0.0); // todo: tune this
 
   audioShield.unmuteHeadphone(); // for debugging
 
@@ -394,7 +395,7 @@ void updateFrequencyColors() {
 
       // make sure we stay on for a minimum amount of time. this prevents flickering if the magnitude changes quickly
       // TODO: i still think something with an exponential moving average might be better
-      turnOnMsArray[i] = millis() + minOnMs / 3;
+      turnOnMsArray[i] = millis() + minOnMs / 2.7182818284590452353602874713527;
       turnOffMsArray[i] = millis() + minOnMs;
     }
   }
