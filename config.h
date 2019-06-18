@@ -53,9 +53,9 @@ const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 33
 // const uint16_t ms_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX)) + 0.5;
 // uint16_t frames_per_shift = 1;  // LUDICROUS SPEED
 // uint16_t frames_per_shift = 2;  // HIGH SPEED
-// uint16_t frames_per_shift = minOnMs / ms_per_frame + 0.5;    // non-seizure speed
-float seconds_for_full_rotation = 42;
-uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX) / ms_per_frame) + 0.5;  // 
+uint16_t frames_per_shift = minOnMs / ms_per_frame + 0.5;    // non-seizure speed
+// float seconds_for_full_rotation = 42;
+// uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX) / ms_per_frame) + 0.5;  // 
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved

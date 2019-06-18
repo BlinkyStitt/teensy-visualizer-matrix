@@ -267,6 +267,13 @@ void setup() {
 
   setupFFTBins();
 
+  randomSeed(analogRead(3));
+
+  Serial.println(random(100));
+  Serial.println(random(100));
+  Serial.println(random(100));
+  Serial.println(random(100));
+
   Serial.println("Starting...");
 }
 
@@ -511,6 +518,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // TODO: i don't like this shift method. it should fade the top pixel and work its way down, not dim the whole column evenly
   // TODO: the top pixels are flickering a lot, too. maybe we need minOnMs here instead of earlier?
   static uint16_t shift = 0;
+  // static uint16_t // TODO: track frames_per_shift and only change shift if that has passed. this will let us change frames_per_shift while it runs
 
   // TODO: should this be static?
   static CHSV new_color;
@@ -521,7 +529,8 @@ void mapSpreadOutputsToVisualizerMatrix() {
   static uint8_t flip_mode = 0;
   static bool new_pattern = true;
   static bool flip_shown[visualizerNumLEDsX] = {false};
-  
+  static bool reverse_rotation = true;
+
   // X seconds normal
   // X seconds mixed
   // X seconds flipped
@@ -533,6 +542,14 @@ void mapSpreadOutputsToVisualizerMatrix() {
       flip_mode = 0;
     }
   }
+
+  EVERY_N_SECONDS(3) {
+    if (random(100) < 34) {
+      reverse_rotation = !reverse_rotation;
+    }
+  }
+
+  // TODO: every X seconds change the frames_per_shift
 
   if (new_pattern) {
     // if (next_pattern == 0) {
@@ -552,7 +569,8 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
   for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
     // TODO: change the rate of frames_per_shift
-    uint8_t shifted_x = (shift / frames_per_shift + x) % visualizerNumLEDsX;
+    // we take the absolute value because shift might negative
+    uint8_t shifted_x = abs((x + shift / frames_per_shift) % visualizerNumLEDsX);
 
     if (numSpreadOutputs == visualizerNumLEDsX) {
       new_color = outputsStretched[shifted_x];
@@ -636,7 +654,11 @@ void mapSpreadOutputsToVisualizerMatrix() {
     visualizer_matrix(x, visualizerNumLEDsY - 1) = border_color;
   }
 
-  shift++;
+  if (reverse_rotation) {
+    shift--;
+  } else {
+    shift++;
+  }
 }
 
 void combineMatrixes() {
