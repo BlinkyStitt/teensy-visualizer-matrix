@@ -514,6 +514,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // use the value to calculate the height for this color
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
       // TODO: tune this. we might want a more interesting curve. though i like the look of each light taking the same amount of time to turn offf
+      // TODO: should we do the frequences[...].average_magnitude / local_max calculations here?
       uint8_t highestIndexToLight = map(new_color.value, value_min, 255, 0, visualizerNumLEDsY - 1);
 
       // uint8_t highestIndexToLight = highestIndexToLight_f;
