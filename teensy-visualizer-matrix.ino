@@ -558,6 +558,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
   }
 
   for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
+    // TODO: change the rate of frames_per_shift
     uint8_t shifted_x = (shift / frames_per_shift + x) % visualizerNumLEDsX;
 
     if (numSpreadOutputs == visualizerNumLEDsX) {
@@ -589,7 +590,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
       flip_shown[x] = true;
       for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
         uint8_t shifted_y = y;
-        if (should_flip_y[x]) {
+        if (should_flip_y[shifted_x]) {
           shifted_y = map_visualizer_y[shifted_y];
         }
 
@@ -614,37 +615,25 @@ void mapSpreadOutputsToVisualizerMatrix() {
     } else {
       // it should be off
 
-      // check the bottom light to see if it is off. the bottom light might be at the top though, so check shifted_y
-      uint8_t shifted_y = 0;
-      if (should_flip_y[x]) {
-        shifted_y = map_visualizer_y[shifted_y];
+      // if new_color is black or close to it, we fade rather then set to black
+      // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
+      for (uint8_t y = 0; y < numLEDsY; y++) {
+        // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
+        visualizer_matrix(x, y) = CRGB::Black;
       }
 
-      if (visualizer_matrix(x, shifted_y)) {
-        // if new_color is black or close to it, we fade rather then set to black
-        // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
-        for (uint8_t y = 0; y < numLEDsY; y++) {
-          // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
-          visualizer_matrix(x, y) = CRGB::Black;
+      if (flip_shown[shifted_x]) {
+        if (flip_mode == 0) {
+          should_flip_y[shifted_x] = false;
+        } else if (flip_mode == 1) {
+          should_flip_y[shifted_x] = !should_flip_y[shifted_x];
+        } else if (flip_mode == 2) {
+          should_flip_y[shifted_x] = true;
+        } else {
+          should_flip_y[shifted_x] = !should_flip_y[shifted_x];
         }
 
-        // don't flip right away. only flip if we have a frame of being off
-      } else {
-        // this column was already off. next time, play from the other side
-
-        if (flip_shown[x]) {
-          if (flip_mode == 0) {
-            should_flip_y[x] = false;
-          } else if (flip_mode == 1) {
-            should_flip_y[x] = !should_flip_y[x];
-          } else if (flip_mode == 2) {
-            should_flip_y[x] = true;
-          } else {
-            should_flip_y[x] = !should_flip_y[x];
-          }
-
-          flip_shown[x] = false;
-        }
+        flip_shown[shifted_x] = false;
       }
     }
   }
