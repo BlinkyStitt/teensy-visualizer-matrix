@@ -572,16 +572,14 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // use the value to calculate the height for this color
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
       // TODO: should we do the frequences[...].average_magnitude / local_max calculations here?
-      uint8_t highestIndexToLight = map(new_color.value, 1, 255, 0, visualizerNumLEDsY - 1);
-
-      // uint8_t highestIndexToLight = highestIndexToLight_f;
+      uint8_t highestIndexToLight = map(new_color.value, 1, 255, 1, visualizerNumLEDsY - 2);
 
       // we are using height instead of brightness to represent how loud the frequency was
       // so set to max brightness
       new_color.value = 255;
 
       flip_shown[shifted_x] = true;
-      for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
+      for (uint8_t y = 1; y <= visualizerNumLEDsY - 2; y++) {
         uint8_t shifted_y = y;
         if (should_flip_y[shifted_x]) {
           shifted_y = map_visualizer_y[shifted_y];
@@ -590,10 +588,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
         if (y < highestIndexToLight) {
           visualizer_matrix(x, shifted_y) = new_color;
         } else if (y == highestIndexToLight) {
-        // // TODO: this looked bad. the top light flickered way too much.
-        //   // the highest lit pixel will have a variable brightness to match the volume
-        //   new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, 127.0, 255.0));
-        //   visualizer_matrix(x, y) = new_color;
+          // TODO: this isn't working how i thought. what i want is if the full bar is going to be lit, light both ends white
           if (y == 0 && highestIndexToLight >= visualizerNumLEDsY - 1) {
             visualizer_matrix(x, shifted_y) = new_color;
           } else {
@@ -610,7 +605,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
       // if new_color is black or close to it, we fade rather then set to black
       // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
-      for (uint8_t y = 0; y < numLEDsY; y++) {
+      for (uint8_t y = 1; y < numLEDsY - 1; y++) {
         // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
         visualizer_matrix(x, y) = CRGB::Black;
       }
@@ -630,6 +625,15 @@ void mapSpreadOutputsToVisualizerMatrix() {
         flip_shown[shifted_x] = false;
       }
     }
+
+    // draw a border
+    uint8_t i = shifted_x % numSpreadOutputs / ledsPerSpreadOutput;
+    uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
+
+    CHSV border_color = CHSV(color_hue, 255, 255);
+
+    visualizer_matrix(x, 0) = border_color;
+    visualizer_matrix(x, visualizerNumLEDsY - 1) = border_color;
   }
 
   shift++;
