@@ -333,8 +333,6 @@ void updateFrequencyColors() {
   // read FFT frequency data into a bunch of levels. assign each level a color and a brightness
   float overall_max = updateLevelsFromFFT();
 
-  float local_max = 0;
-
   // turn off any quiet levels. we do this before turning any lights on so that our loudest frequencies are most
   // responsive
   for (uint16_t i = 0; i < numFreqBands; i++) {
@@ -344,11 +342,9 @@ void updateFrequencyColors() {
       continue;
     }
 
-    local_max = getLocalMaxLevel(i, scale_neighbor_max, overall_max, scale_overall_max);
-
     // turn off if current level is less than the activation threshold
     // TODO: i thought i wanted "if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude / local_max < activate_difference) {"
-    if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude < local_max * activate_difference) {
+    if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude < overall_max * activate_difference) {
       // the output has been on for at least minOnMs and is quiet now
       // if it is on, dim it quickly to off
 
@@ -372,11 +368,9 @@ void updateFrequencyColors() {
   for (uint16_t j = 0; j < numFreqBands; j++) {
     uint16_t i = sortedLevelIndex[j];
 
-    local_max = getLocalMaxLevel(i, scale_neighbor_max, overall_max, scale_overall_max);
-
     // check if current is close to the last max (also check the neighbor maxLevels)
     // TODO: i thought i wanted "if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude / local_max >= activate_difference) {"
-    if (millis() >= turnOnMsArray[i] && frequencies[i].current_magnitude >= local_max * activate_difference) {
+    if (millis() >= turnOnMsArray[i] && frequencies[i].current_magnitude >= overall_max * activate_difference) {
       // https://github.com/FastLED/FastLED/wiki/FastLED-HSV-Colors#color-map-rainbow-vs-spectrum
       // HSV makes it easy to cycle through the rainbow
       // TODO: color-blind color pallete
@@ -392,7 +386,7 @@ void updateFrequencyColors() {
       // TODO: i think we should do an exponential moving average on this
       // uint8_t color_value = max(color_value, frequencyColors[i].value);
 
-      uint8_t reading = frequencies[i].current_magnitude / local_max * 255;
+      uint8_t reading = frequencies[i].current_magnitude / overall_max * 255;
 
       // exponential moving average
       float alpha = 0.98;
