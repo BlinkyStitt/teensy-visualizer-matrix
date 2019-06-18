@@ -525,12 +525,21 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // cycle between different patterns
   static bool should_flip_y[visualizerNumLEDsX] = {false};
   static uint16_t map_visualizer_y[visualizerNumLEDsY] = {0};
-  // static uint8_t num_patterns = 1;
+  static uint8_t flip_mode = 0;
   static bool new_pattern = true;
+  static bool flip_shown[visualizerNumLEDsX] = {false};
   
-  // EVERY_N_MILLIS(ms_per_shift) {
-  //   next_flip = !next_flip;
-  // }
+  // X seconds normal
+  // X seconds mixed
+  // X seconds flipped
+  // X seconds mixed
+  EVERY_N_SECONDS(15) {
+    flip_mode++;
+
+    if (flip_mode > 3) {
+      flip_mode = 0;
+    }
+  }
 
   if (new_pattern) {
     // if (next_pattern == 0) {
@@ -565,11 +574,11 @@ void mapSpreadOutputsToVisualizerMatrix() {
       }
     }
 
-    if (new_color.value >= value_min) {
+    if (new_color.value > 0) {
       // use the value to calculate the height for this color
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
       // TODO: should we do the frequences[...].average_magnitude / local_max calculations here?
-      uint8_t highestIndexToLight = map(new_color.value, value_min, 255, 0, visualizerNumLEDsY - 1);
+      uint8_t highestIndexToLight = map(new_color.value, 1, 255, 0, visualizerNumLEDsY - 1);
 
       // uint8_t highestIndexToLight = highestIndexToLight_f;
 
@@ -577,7 +586,8 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // so set to max brightness
       new_color.value = 255;
 
-      for (uint8_t y=0; y < visualizerNumLEDsY; y++) {
+      flip_shown[x] = true;
+      for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
         uint8_t shifted_y = y;
         if (should_flip_y[x]) {
           shifted_y = map_visualizer_y[shifted_y];
@@ -590,7 +600,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
         //   // the highest lit pixel will have a variable brightness to match the volume
         //   new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, 127.0, 255.0));
         //   visualizer_matrix(x, y) = new_color;
-          if (y == 0) {
+          if (y == 0 && highestIndexToLight >= visualizerNumLEDsY - 1) {
             visualizer_matrix(x, shifted_y) = new_color;
           } else {
             visualizer_matrix(x, shifted_y) = CRGB::White;
@@ -621,8 +631,20 @@ void mapSpreadOutputsToVisualizerMatrix() {
         // don't flip right away. only flip if we have a frame of being off
       } else {
         // this column was already off. next time, play from the other side
-        // TODO: random chance for it to flip sides?
-        should_flip_y[x] = !should_flip_y[x];
+
+        if (flip_shown[x]) {
+          if (flip_mode == 0) {
+            should_flip_y[x] = false;
+          } else if (flip_mode == 1) {
+            should_flip_y[x] = !should_flip_y[x];
+          } else if (flip_mode == 2) {
+            should_flip_y[x] = true;
+          } else {
+            should_flip_y[x] = !should_flip_y[x];
+          }
+
+          flip_shown[x] = false;
+        }
       }
     }
   }
