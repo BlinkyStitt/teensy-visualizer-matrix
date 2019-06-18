@@ -219,7 +219,7 @@ void setupLights() {
 
 void setupAudio() {
   // Audio requires memory to work. I haven't seen this go over 11
-  AudioMemory(12);
+  AudioMemory(11);
 
   // Enable the audio shield and set the output volume.
   audioShield.enable();
