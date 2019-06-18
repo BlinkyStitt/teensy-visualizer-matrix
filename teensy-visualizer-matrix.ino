@@ -114,6 +114,8 @@ float FindE(uint16_t bands, uint16_t minBin, uint16_t maxBin) {
 
 void setupFFTBins() {
   // https://forum.pjrc.com/threads/32677-Is-there-a-logarithmic-function-for-FFT-bin-selection-for-any-given-of-bands?p=133842&viewfull=1#post133842
+
+  // TODO: time this function. i might want to call it while the program is running to tune to whatever was recently heard
   float e, n;
   uint16_t count = minBin, d;
 
