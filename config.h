@@ -52,6 +52,7 @@ const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 33
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
 // 0.5 is added for rounding up
+const uint16_t ms_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX)) + 0.5;
 const uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX) / ms_per_frame) + 0.5;
 
 // how close a sound has to be to the loudest sound in order to activate

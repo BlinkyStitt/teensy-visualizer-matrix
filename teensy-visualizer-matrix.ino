@@ -525,19 +525,11 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // cycle between different patterns
   static bool should_flip_y[visualizerNumLEDsX] = {false};
   static uint16_t map_visualizer_y[visualizerNumLEDsY] = {0};
-  // static uint8_t next_pattern = 0;
   // static uint8_t num_patterns = 1;
   static bool new_pattern = true;
   
-  // EVERY_N_SECONDS(30) {
-  //   next_pattern++;
-
-  //   // cycle
-  //   if (next_pattern >= num_patterns) {
-  //     next_pattern = 0;
-  //   }
-
-  //   new_pattern = true;
+  // EVERY_N_MILLIS(ms_per_shift) {
+  //   next_flip = !next_flip;
   // }
 
   if (new_pattern) {
@@ -586,11 +578,9 @@ void mapSpreadOutputsToVisualizerMatrix() {
       new_color.value = 255;
 
       for (uint8_t y=0; y < visualizerNumLEDsY; y++) {
-        uint8_t shifted_y;
+        uint8_t shifted_y = y;
         if (should_flip_y[x]) {
-          shifted_y = map_visualizer_y[y];
-        } else {
-          shifted_y = y;
+          shifted_y = map_visualizer_y[shifted_y];
         }
 
         if (y < highestIndexToLight) {
@@ -612,13 +602,28 @@ void mapSpreadOutputsToVisualizerMatrix() {
         }
       }
     } else {
-      // if new_color is black or close to it, we fade rather then set to black
-      // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
-      for (uint8_t y = 0; y < numLEDsY; y++) {
-        // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
-        visualizer_matrix(x, y) = CRGB::Black;
+      // it should be off
+
+      // check the bottom light to see if it is off. the bottom light might be at the top though, so check shifted_y
+      uint8_t shifted_y = 0;
+      if (should_flip_y[x]) {
+        shifted_y = map_visualizer_y[shifted_y];
       }
-      should_flip_y[x] = !should_flip_y[x];
+
+      if (visualizer_matrix(x, shifted_y)) {
+        // if new_color is black or close to it, we fade rather then set to black
+        // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
+        for (uint8_t y = 0; y < numLEDsY; y++) {
+          // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
+          visualizer_matrix(x, y) = CRGB::Black;
+        }
+
+        // don't flip right away. only flip if we have a frame of being off
+      } else {
+        // this column was already off. next time, play from the other side
+        // TODO: random chance for it to flip sides?
+        should_flip_y[x] = !should_flip_y[x];
+      }
     }
   }
 
