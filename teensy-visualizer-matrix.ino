@@ -8,7 +8,6 @@
 #include <stdlib.h>
 
 #include <Audio.h>
-#include <DoubleEMAFilterLib.h>
 #include <FastLED.h>
 #include <LEDMatrix.h>
 #include <LEDSprites.h>
@@ -328,8 +327,6 @@ float getLocalMaxLevel(uint16_t i, float scale_neighbor, float overall_max, floa
   return localMaxLevel;
 }
 
-DoubleEMAFilter<uint8_t> magnitudeEMA(0.95, 1.0);
-
 void updateFrequencyColors() {
   // read FFT frequency data into a bunch of levels. assign each level a color and a brightness
   float overall_max = updateLevelsFromFFT();
@@ -395,14 +392,13 @@ void updateFrequencyColors() {
 
       uint8_t reading = frequencies[i].current_magnitude / local_max * 255;
 
-      // magnitudeEMA.AddValue(reading);
-      // uint8_t ema = magnitudeEMA.GetBandStop();
-
       // exponential moving average
       float alpha = 0.98;
       float lastOutput = frequencyColors[i].value;
       float alphaScale = 1.0;
       uint8_t ema = (alpha * reading + (alphaScale - alpha) * lastOutput) / alphaScale;
+
+      // TODO: modify ema such that its harder to get to the top
 
       uint8_t color_value;
       if (ema > frequencyColors[i].value) {
@@ -420,6 +416,7 @@ void updateFrequencyColors() {
       }
 
       // TODO: should we have value_min here?
+      // TODO! do a more interesting curve. though i like the look of each light taking the same amount of time to turn off
       color_value = constrain(color_value, 0, 255);
 
       // TODO: what saturation?
@@ -545,7 +542,6 @@ void mapSpreadOutputsToVisualizerMatrix() {
     if (new_color.value >= value_min) {
       // use the value to calculate the height for this color
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
-      // TODO: tune this. we might want a more interesting curve. though i like the look of each light taking the same amount of time to turn offf
       // TODO: should we do the frequences[...].average_magnitude / local_max calculations here?
       uint8_t highestIndexToLight = map(new_color.value, value_min, 255, 0, visualizerNumLEDsY - 1);
 
