@@ -140,7 +140,7 @@ unsigned long turnOnMsArray[numFreqBands];
 unsigned long turnOffMsArray[numFreqBands];
 
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
-unsigned long draw_ms = 10;
+unsigned long draw_ms = 8;
 unsigned long lastUpdate = 0;
 unsigned long lastDraw = 0;
 
@@ -240,7 +240,7 @@ void setupLights() {
   // TODO: what should this be set to? the flexible panels are much larger
   // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
   // FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 5 * 1000 * 2);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 180); // when running through teensy's usb port, the max draw is much lower than with a battery
+  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
 
   FastLED.setBrightness(DEFAULT_BRIGHTNESS); // TODO: read this from the SD card. or allow tuning with the volume knob
 
@@ -416,7 +416,7 @@ void updateFrequencyColors() {
     local_max = getLocalMaxLevel(i, scale_neighbor_max, overall_max, scale_overall_max);
 
     // turn off if current level is less than the activation threshold
-    // TODO: i'm not sure i like this method anymore. now that we have a y-axis, we can show the true level (it bounces around wild though so will need smoothing)
+    // TODO: i thought i wanted "if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude / local_max < activate_difference) {"
     if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude < local_max * activate_difference) {
       // the output has been on for at least minOnMs and is quiet now
       // if it is on, dim it quickly to off
@@ -444,52 +444,30 @@ void updateFrequencyColors() {
     local_max = getLocalMaxLevel(i, scale_neighbor_max, overall_max, scale_overall_max);
 
     // check if current is close to the last max (also check the neighbor maxLevels)
+    // TODO: i thought i wanted "if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude / local_max >= activate_difference) {"
     if (millis() >= turnOnMsArray[i] && frequencies[i].current_magnitude >= local_max * activate_difference) {
-      // this light should be on!
-      // if (numOn >= maxOn) {
-        // except we already have too many lights on! don't do anything since this light is already off
-        // don't break the loop because we still want to decay max level and process other lights
-      // } else {
-        // we have room for the light! turn it on
+      // https://github.com/FastLED/FastLED/wiki/FastLED-HSV-Colors#color-map-rainbow-vs-spectrum
+      // HSV makes it easy to cycle through the rainbow
+      // TODO: color-blind color pallete
+      // map(value, fromLow, fromHigh, toLow, toHigh)
+      uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
 
-        // if it isn't already on, increment numOn
-        // if (!frequencyColors[i].value) {
-        //   // track to make sure we don't turn too many lights on. some configurations max out at 6.
-        //   // we don't do this every time because it could have already been on, but now we made it brighter
-        //   numOn += 1;
-        // }
+      // use 255 as the max brightness. if that is too bright, FastLED.setBrightness can be changed in setup to reduce
+      // what 255 does
+      uint8_t color_value = constrain(uint8_t(frequencies[i].current_magnitude / local_max * 255), value_min, 255);
 
-        // TODO: color-blind color pallete
-        // map(value, fromLow, fromHigh, toLow, toHigh)
-        uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
-        // use 255 as the max brightness. if that is too bright, FastLED.setBrightness can be changed in setup to reduce
-        // what 255 does
+      // TODO: what saturation?
+      frequencyColors[i] = CHSV(color_hue, 255, color_value);
 
-        // look at neighbors and use their max for brightness if they are louder (but don't be less than 10% on!)
-        // TODO: s-curve? i think FastLED actually does a curve for us
-        // TODO: what should the min be? should we limit how fast it moves around by including frequencyColors[i].value here?
-        // notie how we getLocalMax but exclude the overall volume. we only want that for on/off. if we include it here everything flickers too much
-        // TODO: make it so we can include global max without flicker. replace turnOffMsArray with a changeMsArray that stops changes from happening faster than the flicker rate
-        // TODO: or maybe we should leave the white top at the same place and add colors above it if they come in fast
-        // uint8_t color_value = constrain(uint8_t(frequencies[i].current_magnitude / getLocalMaxLevel(i, scale_neighbor_max, 0, 0) * 255), value_min, 255);
-        uint8_t color_value = constrain(uint8_t(frequencies[i].current_magnitude / local_max * 255), value_min, 255);
-
-        // https://github.com/FastLED/FastLED/wiki/FastLED-HSV-Colors#color-map-rainbow-vs-spectrum
-        // HSV makes it easy to cycle through the rainbow
-        // TODO: color from a pallet instead.
-        // TODO: what saturation?
-        frequencyColors[i] = CHSV(color_hue, 255, color_value);
-
-        // make sure we stay on for a minimum amount of time
-        // if we were already on, extend the time that we stay on
-        turnOnMsArray[i] = millis() + minOnMs / 2;
-        turnOffMsArray[i] = millis() + minOnMs;
-      // }
+      // make sure we stay on for a minimum amount of time. this prevents flickering if the magnitude changes quickly
+      // TODO: i still think something with an exponential moving average might be better
+      turnOnMsArray[i] = millis() + minOnMs / 3;
+      turnOffMsArray[i] = millis() + minOnMs;
     }
   }
 
   // debug print
-  // TODO: wrap this in an ifdef DEBUG
+#ifdef DEBUG
   for (uint16_t i = 0; i < numFreqBands; i++) {
     Serial.print("| ");
 
@@ -508,15 +486,13 @@ void updateFrequencyColors() {
   Serial.print("| ");
   Serial.print(AudioMemoryUsageMax());
   Serial.print(" blocks | ");
-  // Serial.print(" blocks | Num On=");
-  // Serial.print(numOn);
-  // Serial.print(" | ");
 
   // finish debug print
   Serial.print(millis() - lastUpdate);
   Serial.println("ms");
   lastUpdate = millis();
-  // Serial.flush();
+  Serial.flush();
+#endif
 }
 
 void mapFrequencyColorsToOutputs() {
