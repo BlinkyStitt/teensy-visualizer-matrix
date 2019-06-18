@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include <Audio.h>
+#include <DoubleEMAFilterLib.h>
 #include <FastLED.h>
 #include <LEDMatrix.h>
 #include <LEDSprites.h>
@@ -59,11 +60,6 @@ AudioAnalyzeFFT1024 fft1024;
 AudioConnection patchCord1(i2s1, 0, i2s2, 0);
 AudioConnection patchCord2(i2s1, 0, fft1024, 0);
 AudioControlSGTL5000 audioShield; // xy=366,225
-
-// we don't want all the levels to be on at once
-// TODO: change this now that we are connected to a matrix
-// const uint8_t maxOn = numOutputs * 3 / 4;
-// uint8_t numOn = 0;
 
 // going through the levels loudest to quietest makes it so we can ensure the loudest get turned on ASAP
 int sortedLevelIndex[numFreqBands];
@@ -332,6 +328,8 @@ float getLocalMaxLevel(uint16_t i, float scale_neighbor, float overall_max, floa
   return localMaxLevel;
 }
 
+DoubleEMAFilter<uint8_t> magnitudeEMA(0.95, 1.0);
+
 void updateFrequencyColors() {
   // read FFT frequency data into a bunch of levels. assign each level a color and a brightness
   float overall_max = updateLevelsFromFFT();
@@ -388,7 +386,41 @@ void updateFrequencyColors() {
 
       // use 255 as the max brightness. if that is too bright, FastLED.setBrightness can be changed in setup to reduce
       // what 255 does
-      uint8_t color_value = constrain(uint8_t(frequencies[i].current_magnitude / local_max * 255), value_min, 255);
+      // uint8_t color_value = 
+      // TODO: -= fade_rate instead?
+      // use max to let it climb quickly but fall slowly
+      // TODO: we were doing  * decayMax here, but we do it elsewhere
+      // TODO: i think we should do an exponential moving average on this
+      // uint8_t color_value = max(color_value, frequencyColors[i].value);
+
+      uint8_t reading = frequencies[i].current_magnitude / local_max * 255;
+
+      // magnitudeEMA.AddValue(reading);
+      // uint8_t ema = magnitudeEMA.GetBandStop();
+
+      // exponential moving average
+      float alpha = 0.98;
+      float lastOutput = frequencyColors[i].value;
+      float alphaScale = 1.0;
+      uint8_t ema = (alpha * reading + (alphaScale - alpha) * lastOutput) / alphaScale;
+
+      uint8_t color_value;
+      if (ema > frequencyColors[i].value) {
+        // if the magnitude is increasing, just set it to the ema
+        color_value = ema;
+      } else {
+        // if the magnitude is decreasing...
+        uint8_t lastOutputDecreased = frequencyColors[i].value * decayMax - fade_rate;
+
+        if (ema > lastOutputDecreased) {
+          color_value = ema;
+        } else {
+          color_value = lastOutputDecreased;
+        }
+      }
+
+      // TODO: should we have value_min here?
+      color_value = constrain(color_value, 0, 255);
 
       // TODO: what saturation?
       frequencyColors[i] = CHSV(color_hue, 255, color_value);
