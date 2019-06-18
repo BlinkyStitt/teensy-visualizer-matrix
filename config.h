@@ -55,9 +55,11 @@ const uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(nu
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved
-const float activate_difference = 4.0/8.0;
-// simple % decrease (TODO: rename this. it is how we fade to black, too)
-const float decayMax = 0.98;  // was .98
+const float activate_difference = 2.0/8.0;
+// simple % decrease (TODO: rename this. it is how we fade to black, too. i think we should change this to )
+const float decayMax = 0.99;  // was .98
+// TODO: not sure i like how this works. i want a more explicit link between this value and how long it takes to fade to black
+const uint8_t value_min = 32;
 // set a floor so that decayMax doesn't go too low
 const float minMaxLevel = 0.16 / activate_difference;
 
@@ -65,5 +67,3 @@ const float minMaxLevel = 0.16 / activate_difference;
 const float scale_neighbor_max = 0.9;
 // how much of all the other bin's max to consider when deciding when to turn on
 const float scale_overall_max = 0.3;
-// TODO: not sure i like how this works. i want a more explicit link between this value and how long it takes to fade to black
-const uint8_t value_min = 32;

@@ -240,7 +240,7 @@ void setupAudio() {
   // audioShield.eqBands(-0.5, -.2, 0, .2, .5);  // todo: tune this
   // audioShield.eqBands(-0.80, -0.10, 0, 0.10, 0.33);  // todo: tune this
   //audioShield.eqBands(0.0, 0.0, 0.0, 0.1, 0.33); // todo: tune this
-  audioShield.eqBands(0.2, 0.1, 0.0, 0.0, 0.0); // todo: tune this
+  audioShield.eqBands(0.4, 0.2, 0.0, 0.0, 0.0); // todo: tune this
 
   audioShield.unmuteHeadphone(); // for debugging
 
@@ -395,7 +395,7 @@ void updateFrequencyColors() {
 
       // make sure we stay on for a minimum amount of time. this prevents flickering if the magnitude changes quickly
       // TODO: i still think something with an exponential moving average might be better
-      turnOnMsArray[i] = millis() + minOnMs / 2.7182818284590452353602874713527;
+      turnOnMsArray[i] = millis() + minOnMs / 2.1;
       turnOffMsArray[i] = millis() + minOnMs;
     }
   }
@@ -530,7 +530,11 @@ void mapSpreadOutputsToVisualizerMatrix() {
         //   // the highest lit pixel will have a variable brightness to match the volume
         //   new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, 127.0, 255.0));
         //   visualizer_matrix(x, y) = new_color;
-          visualizer_matrix(x, y) = CRGB::White;
+          if (y == 0) {
+            visualizer_matrix(x, y) = new_color;
+          } else {
+            visualizer_matrix(x, y) = CRGB::White;
+          }
         } else {
           // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
           // visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
