@@ -530,20 +530,23 @@ void mapSpreadOutputsToVisualizerMatrix() {
   static bool new_pattern = true;
   static bool flip_shown[visualizerNumLEDsX] = {false};
   static bool reverse_rotation = true;
+  static uint8_t frames_per_shift_index = 0;
+  static uint8_t current_frames_per_shift = frames_per_shift[frames_per_shift_index];
 
   // TODO: every X seconds change the frames_per_shift
+  // EVERY_N_SECONDS(3) {
+  //   frames_per_shift_index++;
+  //   if (frames_per_shift_index >= 3) {
+  //     frames_per_shift_index = 0;
+  //   }
+  // }
+  // TODO: do an interesting curve on current_frames_per_shift to head towards frames_per_shift[frames_per_shift_index]. ema might work for now
+  current_frames_per_shift = frames_per_shift[frames_per_shift_index];
 
   if (new_pattern) {
-    // if (next_pattern == 0) {
-    //   for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
-    //     map_visualizer_y[y] = y;
-    //   }
-    // } else {
     for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
       map_visualizer_y[y] = 7 - y;
     }
-    // }
-
     // TODO: this is too simplistic. i want a pattern where it goes outward and inward
 
     new_pattern = false;
@@ -552,7 +555,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
   for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
     // TODO: restructure this to change the rate of frames_per_shift.
     // we take the absolute value because shift might negative
-    uint8_t shifted_x = abs((x + shift / frames_per_shift[0]) % visualizerNumLEDsX);
+    uint8_t shifted_x = abs((x + shift) % visualizerNumLEDsX);
 
     if (numSpreadOutputs == visualizerNumLEDsX) {
       new_color = outputsStretched[shifted_x];
@@ -669,10 +672,14 @@ void mapSpreadOutputsToVisualizerMatrix() {
     visualizer_matrix(x, visualizerNumLEDsY - 1) = border_color;
   }
 
-  if (reverse_rotation) {
-    shift--;
-  } else {
-    shift++;
+  frames_since_last_shift++;
+  if (frames_since_last_shift >= current_frames_per_shift) {
+    frames_since_last_shift = 0;
+    if (reverse_rotation) {
+      shift--;
+    } else {
+      shift++;
+    }
   }
 }
 

@@ -52,11 +52,11 @@ const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 33
 float seconds_for_slow_rotation = 42;
 uint16_t frames_per_shift[] = {
   // maximum speed (no seizure speed)
-  minOnMs / ms_per_frame + 0.5,
+  uint16_t(minOnMs / ms_per_frame + 0.5),
   // slow speed
-  (seconds_for_slow_rotation * 1000.0 / float(numLEDsX) / ms_per_frame) + 0.5,
+  uint16_t(seconds_for_slow_rotation * 1000.0 / float(numLEDsX) / ms_per_frame + 0.5),
   // ludicrous speed
-  2,
+  4,
 };
 
 // how close a sound has to be to the loudest sound in order to activate
