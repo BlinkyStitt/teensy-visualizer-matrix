@@ -409,12 +409,9 @@ void updateFrequencyColors() {
       } else {
         // if the magnitude is decreasing...
         uint8_t lastOutputDecreased = frequencyColors[i].value * decayMax - fade_rate;
+        uint8_t emaDecreased = ema - fade_rate / 2;
 
-        if (ema > lastOutputDecreased) {
-          color_value = ema;
-        } else {
-          color_value = lastOutputDecreased;
-        }
+        color_value = max(lastOutputDecreased, emaDecreased);
       }
 
       // TODO: should we have value_min here?
@@ -535,7 +532,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // X seconds mixed
   // X seconds flipped
   // X seconds mixed
-  EVERY_N_SECONDS(15) {
+  EVERY_N_SECONDS(17) {
     flip_mode++;
 
     if (flip_mode > 1) {
