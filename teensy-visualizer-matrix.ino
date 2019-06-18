@@ -198,21 +198,21 @@ void setupLights() {
   Serial.println("ms");
 
   // now delay for more time to make sure that fastled can power this many lights and update with this bandwidth
-  FastLED.delay(2000 - draw_ms);
+  FastLED.delay(1500 - draw_ms);
 
   Serial.println("Showing green...");
   colorPattern(CRGB::Green);
   // TODO: fastled.delay is sending refreshes too quickly and crashing
   // FastLED.show();
   // delay(1500);
-  FastLED.delay(2000);
+  FastLED.delay(1500);
 
   Serial.println("Showing blue...");
   colorPattern(CRGB::Blue);
   // TODO: fastled.delay is sending refreshes too quickly and crashing
   // FastLED.show();
   // delay(1500);
-  FastLED.delay(2000);
+  FastLED.delay(1500);
 }
 
 void setupAudio() {
@@ -235,7 +235,7 @@ void setupAudio() {
   // audioShield.eqBands(-0.5, -.2, 0, .2, .5);  // todo: tune this
   // audioShield.eqBands(-0.80, -0.10, 0, 0.10, 0.33);  // todo: tune this
   //audioShield.eqBands(0.0, 0.0, 0.0, 0.1, 0.33); // todo: tune this
-  audioShield.eqBands(0.616, 0.307, 0.0, 0.0, 0.0); // todo: tune this
+  audioShield.eqBands(0.8, 0.5, 0.0, 0.0, 0.0); // todo: tune this
 
   audioShield.unmuteHeadphone(); // for debugging
 
@@ -536,7 +536,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
   EVERY_N_SECONDS(15) {
     flip_mode++;
 
-    if (flip_mode > 3) {
+    if (flip_mode > 1) {
       flip_mode = 0;
     }
   }
@@ -587,7 +587,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // so set to max brightness
       new_color.value = 255;
 
-      flip_shown[x] = true;
+      flip_shown[shifted_x] = true;
       for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
         uint8_t shifted_y = y;
         if (should_flip_y[shifted_x]) {
@@ -625,12 +625,13 @@ void mapSpreadOutputsToVisualizerMatrix() {
       if (flip_shown[shifted_x]) {
         if (flip_mode == 0) {
           should_flip_y[shifted_x] = false;
-        } else if (flip_mode == 1) {
-          should_flip_y[shifted_x] = !should_flip_y[shifted_x];
-        } else if (flip_mode == 2) {
-          should_flip_y[shifted_x] = true;
+        // } else if (flip_mode == 1) {
+        //   should_flip_y[shifted_x] = !should_flip_y[shifted_x];
+        // } else if (flip_mode == 1) {
         } else {
-          should_flip_y[shifted_x] = !should_flip_y[shifted_x];
+          should_flip_y[shifted_x] = true;
+        // } else {
+        //   should_flip_y[shifted_x] = !should_flip_y[shifted_x];
         }
 
         flip_shown[shifted_x] = false;

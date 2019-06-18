@@ -62,7 +62,7 @@ const float activate_difference = 4.5 / 8.0;
 const float decayMax = 0.99;  // was .98
 // TODO: not sure i like how this works. i want a more explicit link between this value and how long it takes to fade to black
 const uint8_t value_min = 32;
-const uint8_t fade_rate = 0.195 * 255;
+const uint8_t fade_rate = 0.255 * 255;
 // set a floor so that decayMax doesn't go too low
 const float minMaxLevel = 0.16 / activate_difference;
 
