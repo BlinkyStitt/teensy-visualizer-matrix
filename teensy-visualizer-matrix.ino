@@ -237,7 +237,7 @@ void setupAudio() {
   // audioShield.eqBands(-0.5, -.2, 0, .2, .5);  // todo: tune this
   // audioShield.eqBands(-0.80, -0.10, 0, 0.10, 0.33);  // todo: tune this
   //audioShield.eqBands(0.0, 0.0, 0.0, 0.1, 0.33); // todo: tune this
-  audioShield.eqBands(0.8, 0.5, 0.0, 0.0, 0.0); // todo: tune this
+  audioShield.eqBands(0.5, 0.5, 0.0, 0.0, 0.0); // todo: tune this
 
   audioShield.unmuteHeadphone(); // for debugging
 
