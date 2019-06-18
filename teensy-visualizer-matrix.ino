@@ -522,6 +522,40 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // TODO: should this be static?
   static CHSV new_color;
 
+  // cycle between different patterns
+  static bool should_flip_y[visualizerNumLEDsX] = {false};
+  static uint16_t map_visualizer_y[visualizerNumLEDsY] = {0};
+  // static uint8_t next_pattern = 0;
+  // static uint8_t num_patterns = 1;
+  static bool new_pattern = true;
+  
+  // EVERY_N_SECONDS(30) {
+  //   next_pattern++;
+
+  //   // cycle
+  //   if (next_pattern >= num_patterns) {
+  //     next_pattern = 0;
+  //   }
+
+  //   new_pattern = true;
+  // }
+
+  if (new_pattern) {
+    // if (next_pattern == 0) {
+    //   for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
+    //     map_visualizer_y[y] = y;
+    //   }
+    // } else {
+    for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
+      map_visualizer_y[y] = 7 - y;
+    }
+    // }
+
+    // TODO: this is too simplistic. i want a pattern where it goes outward and inward
+
+    new_pattern = false;
+  }
+
   for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
     uint8_t shifted_x = (shift / frames_per_shift + x) % visualizerNumLEDsX;
 
@@ -552,22 +586,29 @@ void mapSpreadOutputsToVisualizerMatrix() {
       new_color.value = 255;
 
       for (uint8_t y=0; y < visualizerNumLEDsY; y++) {
+        uint8_t shifted_y;
+        if (should_flip_y[x]) {
+          shifted_y = map_visualizer_y[y];
+        } else {
+          shifted_y = y;
+        }
+
         if (y < highestIndexToLight) {
-          visualizer_matrix(x, y) = new_color;
+          visualizer_matrix(x, shifted_y) = new_color;
         } else if (y == highestIndexToLight) {
         // // TODO: this looked bad. the top light flickered way too much.
         //   // the highest lit pixel will have a variable brightness to match the volume
         //   new_color.value = uint(map_float(highestIndexToLight_f - y, 0.0, 1.0, 127.0, 255.0));
         //   visualizer_matrix(x, y) = new_color;
           if (y == 0) {
-            visualizer_matrix(x, y) = new_color;
+            visualizer_matrix(x, shifted_y) = new_color;
           } else {
-            visualizer_matrix(x, y) = CRGB::White;
+            visualizer_matrix(x, shifted_y) = CRGB::White;
           }
         } else {
           // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
           // visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
-          visualizer_matrix(x, y) = CRGB::Black;
+          visualizer_matrix(x, shifted_y) = CRGB::Black;
         }
       }
     } else {
@@ -577,6 +618,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
         // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
         visualizer_matrix(x, y) = CRGB::Black;
       }
+      should_flip_y[x] = !should_flip_y[x];
     }
   }
 
