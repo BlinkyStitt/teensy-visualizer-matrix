@@ -2,6 +2,9 @@
 #define DEBUG_SERIAL_WAIT
 #include "bs_debug.h"
 
+// TODO: not sure about this
+// #define FASTLED_ALLOW_INTERRUPTS 0
+
 #include <stdlib.h>
 
 #include <Audio.h>
@@ -66,17 +69,16 @@ const uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(nu
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved
-const float activate_threshold = 0.5;
+const float activate_difference = 4.0/8.0;
 // simple % decrease
 const float decayMax = 0.98;  // was .98
 // set a floor so that decayMax doesn't go too low
-const float minMaxLevel = 0.16 / activate_threshold;
+const float minMaxLevel = 0.16 / activate_difference;
 
 // how much of the neighbor's max to consider when deciding when to turn on
 const float scale_neighbor_max = 0.9;
 // how much of all the other bin's max to consider when deciding when to turn on
-// TODO: i thought with log scaled bins this would be able to be closer to 1, but the bass gets ignored
-const float scale_overall_max = 0.345;
+const float scale_overall_max = 0.3;
 // TODO: not sure i like how this works
 const uint8_t value_min = 32;
 // how quickly to fade to black
@@ -268,21 +270,21 @@ void setupLights() {
   Serial.println("ms");
 
   // now delay for more time to make sure that fastled can power this many lights and update with this bandwidth
-  FastLED.delay(1000 - draw_ms);
+  FastLED.delay(2000 - draw_ms);
 
   Serial.println("Showing green...");
   colorPattern(CRGB::Green);
   // TODO: fastled.delay is sending refreshes too quickly and crashing
   // FastLED.show();
   // delay(1500);
-  FastLED.delay(1000);
+  FastLED.delay(2000);
 
   Serial.println("Showing blue...");
   colorPattern(CRGB::Blue);
   // TODO: fastled.delay is sending refreshes too quickly and crashing
   // FastLED.show();
   // delay(1500);
-  FastLED.delay(1000);
+  FastLED.delay(2000);
 }
 
 void setupAudio() {
@@ -296,16 +298,15 @@ void setupAudio() {
   audioShield.volume(0.5);
   audioShield.micGain(60); // was 63, then 40  // 0-63 // TODO: tune this
 
-  audioShield.audioPreProcessorEnable(); // todo: pre or post?
+  //audioShield.audioPreProcessorEnable(); // todo: pre or post?
 
   // bass, mid_bass, midrange, mid_treble, treble
   // TODO: tune this. maybe read from SD card
-  audioShield.eqSelect(GRAPHIC_EQUALIZER);
+  //audioShield.eqSelect(GRAPHIC_EQUALIZER);
   // audioShield.eqBands(-0.80, -0.75, -0.50, 0.50, 0.80);  // the great northern
   // audioShield.eqBands(-0.5, -.2, 0, .2, .5);  // todo: tune this
   // audioShield.eqBands(-0.80, -0.10, 0, 0.10, 0.33);  // todo: tune this
-  // audioShield.eqBands(0.0, 0.0, 0.0, 0.1, 0.33); // todo: tune this
-  audioShield.eqBands(0.8, 0.5, 0.2, 0.0, 0.0); // todo: tune this
+  //audioShield.eqBands(0.0, 0.0, 0.0, 0.1, 0.33); // todo: tune this
 
   audioShield.unmuteHeadphone(); // for debugging
 
@@ -406,6 +407,7 @@ void updateFrequencyColors() {
   // turn off any quiet levels. we do this before turning any lights on so that our loudest frequencies are most
   // responsive
   for (uint16_t i = 0; i < numFreqBands; i++) {
+    // TODO: not sure that activate_difference is what we want here. this is probably broken since we changed how levels are saved
     if (frequencyColors[i].value == 0) {
       // this light is already off
       continue;
@@ -415,7 +417,7 @@ void updateFrequencyColors() {
 
     // turn off if current level is less than the activation threshold
     // TODO: i'm not sure i like this method anymore. now that we have a y-axis, we can show the true level (it bounces around wild though so will need smoothing)
-    if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude / local_max < activate_threshold) {
+    if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude < local_max * activate_difference) {
       // the output has been on for at least minOnMs and is quiet now
       // if it is on, dim it quickly to off
 
@@ -442,15 +444,34 @@ void updateFrequencyColors() {
     local_max = getLocalMaxLevel(i, scale_neighbor_max, overall_max, scale_overall_max);
 
     // check if current is close to the last max (also check the neighbor maxLevels)
-    if (millis() >= turnOnMsArray[i] && frequencies[i].current_magnitude / local_max >= activate_threshold) {
+    if (millis() >= turnOnMsArray[i] && frequencies[i].current_magnitude >= local_max * activate_difference) {
+      // this light should be on!
+      // if (numOn >= maxOn) {
+        // except we already have too many lights on! don't do anything since this light is already off
+        // don't break the loop because we still want to decay max level and process other lights
+      // } else {
+        // we have room for the light! turn it on
+
+        // if it isn't already on, increment numOn
+        // if (!frequencyColors[i].value) {
+        //   // track to make sure we don't turn too many lights on. some configurations max out at 6.
+        //   // we don't do this every time because it could have already been on, but now we made it brighter
+        //   numOn += 1;
+        // }
+
         // TODO: color-blind color pallete
         // map(value, fromLow, fromHigh, toLow, toHigh)
         uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
-
         // use 255 as the max brightness. if that is too bright, FastLED.setBrightness can be changed in setup to reduce
         // what 255 does
 
         // look at neighbors and use their max for brightness if they are louder (but don't be less than 10% on!)
+        // TODO: s-curve? i think FastLED actually does a curve for us
+        // TODO: what should the min be? should we limit how fast it moves around by including frequencyColors[i].value here?
+        // notie how we getLocalMax but exclude the overall volume. we only want that for on/off. if we include it here everything flickers too much
+        // TODO: make it so we can include global max without flicker. replace turnOffMsArray with a changeMsArray that stops changes from happening faster than the flicker rate
+        // TODO: or maybe we should leave the white top at the same place and add colors above it if they come in fast
+        // uint8_t color_value = constrain(uint8_t(frequencies[i].current_magnitude / getLocalMaxLevel(i, scale_neighbor_max, 0, 0) * 255), value_min, 255);
         uint8_t color_value = constrain(uint8_t(frequencies[i].current_magnitude / local_max * 255), value_min, 255);
 
         // https://github.com/FastLED/FastLED/wiki/FastLED-HSV-Colors#color-map-rainbow-vs-spectrum
@@ -459,8 +480,9 @@ void updateFrequencyColors() {
         // TODO: what saturation?
         frequencyColors[i] = CHSV(color_hue, 255, color_value);
 
-        // set timers so we don't change this light too quickly (causing flicker)
-        turnOnMsArray[i] = millis() + minOnMs / 3;  // TODO: use a seperate value?
+        // make sure we stay on for a minimum amount of time
+        // if we were already on, extend the time that we stay on
+        turnOnMsArray[i] = millis() + minOnMs / 2;
         turnOffMsArray[i] = millis() + minOnMs;
       // }
     }
