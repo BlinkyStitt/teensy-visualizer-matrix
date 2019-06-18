@@ -38,12 +38,9 @@ const uint8_t visualizerNumLEDsX = numSpreadOutputs;
 const uint8_t visualizerNumLEDsY = numLEDsY;
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 
-// slide the leds over 1 every X frames
-// TODO: tune this now that the LEDs are denser. this might be way too fast
-float seconds_for_full_rotation = 42.0;
 const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 
-// the shortest amount of time to leave an output on before starting to dim it
+// the shortest amount of time to leave an output on before starting to change it
 // it will stay on longer than this depending on time required to dim to off
 // https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
 // "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
@@ -51,9 +48,14 @@ const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwi
 const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 337?
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
+// slide the leds over 1 every X frames
 // 0.5 is added for rounding up
 // const uint16_t ms_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX)) + 0.5;
-uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX) / ms_per_frame) + 0.5;
+// uint16_t frames_per_shift = 1;  // LUDICROUS SPEED
+// uint16_t frames_per_shift = 2;  // HIGH SPEED
+// uint16_t frames_per_shift = minOnMs / ms_per_frame + 0.5;    // non-seizure speed
+float seconds_for_full_rotation = 42;
+uint16_t frames_per_shift = (seconds_for_full_rotation * 1000.0 / float(numLEDsX) / ms_per_frame) + 0.5;  // 
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: i think we should change this now that we have a y-axis to use. lower this to like 33% and have the current, neighbor, max volumes always involved
