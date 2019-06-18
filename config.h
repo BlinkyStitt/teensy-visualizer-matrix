@@ -69,4 +69,5 @@ const float minMaxLevel = 0.16 / activate_difference;
 // how much of the neighbor's max to consider when deciding when to turn on
 const float scale_neighbor_max = 0.9;
 // how much of all the other bin's max to consider when deciding when to turn on
-const float scale_overall_max = 0.616;
+// TODO: i feel like this should be close to 1 since the bins should all be close to equal size, but that is making it jump too much
+const float scale_overall_max = 0.4;
