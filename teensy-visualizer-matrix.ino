@@ -526,13 +526,13 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // cycle between different patterns
   static bool should_flip_y[visualizerNumLEDsX] = {false};
   static uint16_t map_visualizer_y[visualizerNumLEDsY] = {0};
-  static uint8_t flip_mode = 0;
+  static bool flip_y = false;
   static bool new_pattern = true;
   static bool flip_shown[visualizerNumLEDsX] = {false};
   static bool reverse_rotation = true;
   static uint8_t frames_per_shift_index = 0;
   static uint8_t current_frames_per_shift = frames_per_shift[frames_per_shift_index];
-  static unsigned long next_change_frames_per_shift = 0;
+  // static unsigned long next_change_frames_per_shift = 0;
 
   // TODO: every X seconds change the frames_per_shift
   // if (millis() >= next_change_frames_per_shift) {
@@ -595,49 +595,27 @@ void mapSpreadOutputsToVisualizerMatrix() {
           shifted_y = map_visualizer_y[shifted_y];
         }
 
-        if (y == 1) {
-          // bottom index is special
-          if (highestIndexToLight >= visualizerNumLEDsY - 2) {
-            // the top light is lit, so light this one white
-            visualizer_matrix(x, shifted_y) = CRGB::White;
-          } else {
-            // otherwhise show the color and not white (this overrides being the top)
-            visualizer_matrix(x, shifted_y) = new_color;
-          }
-        } else if (y < highestIndexToLight) {
+        if (y < highestIndexToLight) {
           // simple color bar
           visualizer_matrix(x, shifted_y) = new_color;
         } else if (y == highestIndexToLight) {
-          // TODO: this isn't working how i thought. what i want is if the full bar is going to be lit, light both ends white
           visualizer_matrix(x, shifted_y) = CRGB::White;
 
           if (highestIndexToLight >= visualizerNumLEDsY - 2) {
-
             if (random(100) < 50) {
-              // if we hit the top, flip this for the next time
-              should_flip_y[shifted_x] = !should_flip_y[shifted_x];
-              flip_shown[shifted_x] = false;
-            } else {
-              if (random(100) < 16) {
-                EVERY_N_SECONDS(3) {
-                  // TODO: instead of a hard rotate, cycle speeds. 
-                  reverse_rotation = !reverse_rotation;
-                }
+              EVERY_N_SECONDS(3) {
+                // TODO: instead of a hard rotate, cycle speeds. 
+                reverse_rotation = !reverse_rotation;
               }
-            }
+            } else {
+              EVERY_N_SECONDS(3) {
+                flip_y = !flip_y;
 
-            if (random(100) < 50) {
-              // TODO: random chance for this?
-              // X seconds normal
-              // X seconds mixed
-              // X seconds flipped
-              // X seconds mixed
-              EVERY_N_SECONDS(17) {
-                flip_mode++;
+                // if we hit the top, light both ends white and flip this for the next time
+                visualizer_matrix(x, 1) = CRGB::White;
 
-                if (flip_mode > 1) {
-                  flip_mode = 0;
-                }
+                should_flip_y[shifted_x] = flip_y;
+                flip_shown[shifted_x] = false;
               }
             }
           }
@@ -659,12 +637,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
       if (flip_shown[shifted_x]) {
         // we used to have a mode that would toggle, but i like two modes more
-        if (flip_mode == 0) {
-          should_flip_y[shifted_x] = false;
-        } else {
-          should_flip_y[shifted_x] = true;
-        }
-
+        should_flip_y[shifted_x] = flip_y;
         flip_shown[shifted_x] = false;
       }
     }
