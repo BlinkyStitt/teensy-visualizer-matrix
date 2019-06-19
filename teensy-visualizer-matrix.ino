@@ -532,16 +532,23 @@ void mapSpreadOutputsToVisualizerMatrix() {
   static bool reverse_rotation = true;
   static uint8_t frames_per_shift_index = 0;
   static uint8_t current_frames_per_shift = frames_per_shift[frames_per_shift_index];
+  static unsigned long next_change_frames_per_shift = 0;
 
   // TODO: every X seconds change the frames_per_shift
-  // EVERY_N_SECONDS(3) {
+  // if (millis() >= next_change_frames_per_shift) {
   //   frames_per_shift_index++;
-  //   if (frames_per_shift_index >= 3) {
+  //   // TODO: we have 3, but slow is boring
+  //   if (frames_per_shift_index >= 2) {
   //     frames_per_shift_index = 0;
   //   }
+
+  //   // TODO: different lengths for different modes
+  //   // TODO: have a struct for this
+  //   next_change_frames_per_shift = millis() + 3000;
   // }
-  // TODO: do an interesting curve on current_frames_per_shift to head towards frames_per_shift[frames_per_shift_index]. ema might work for now
-  current_frames_per_shift = frames_per_shift[frames_per_shift_index];
+
+  // // TODO: do an interesting curve on current_frames_per_shift to head towards frames_per_shift[frames_per_shift_index]. ema might work for now
+  // current_frames_per_shift = frames_per_shift[frames_per_shift_index];
 
   if (new_pattern) {
     for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
