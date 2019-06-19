@@ -60,11 +60,11 @@ uint16_t frames_per_shift[] = {
 };
 
 // how close a sound has to be to the loudest sound in order to activate
-const float activate_difference = 4.5 / 8.0;
+const float activate_difference = 1.0 / 6.0;
 // simple % decrease
 const float decayMax = 0.99;  // was .98
 // TODO: not sure i like how this works. i want a more explicit link between this value and how long it takes to fade to black
 const uint8_t value_min = 32;
 const uint8_t fade_rate = 64;
 // set a floor so that decayMax doesn't go too low
-const float minMaxLevel = 0.16 / activate_difference;
+const float minMaxLevel = 0.10 / activate_difference;

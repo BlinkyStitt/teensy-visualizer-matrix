@@ -226,18 +226,18 @@ void setupAudio() {
   audioShield.muteHeadphone(); // to avoid any clicks
   audioShield.inputSelect(AUDIO_INPUT_MIC);
   audioShield.volume(0.5);
-  audioShield.micGain(60); // was 63, then 40  // 0-63 // TODO: tune this
+  audioShield.micGain(63); // was 63, then 40  // 0-63 // TODO: tune this
 
-  audioShield.audioPreProcessorEnable(); // todo: pre or post?
+  // audioShield.audioPreProcessorEnable(); // todo: pre or post?
 
   // bass, mid_bass, midrange, mid_treble, treble
   // TODO: tune this. maybe read from SD card
-  audioShield.eqSelect(GRAPHIC_EQUALIZER);
+  // audioShield.eqSelect(GRAPHIC_EQUALIZER);
   // audioShield.eqBands(-0.80, -0.75, -0.50, 0.50, 0.80);  // the great northern
   // audioShield.eqBands(-0.5, -.2, 0, .2, .5);  // todo: tune this
   // audioShield.eqBands(-0.80, -0.10, 0, 0.10, 0.33);  // todo: tune this
   //audioShield.eqBands(0.0, 0.0, 0.0, 0.1, 0.33); // todo: tune this
-  audioShield.eqBands(0.5, 0.5, 0.0, 0.0, 0.0); // todo: tune this
+  // audioShield.eqBands(0.5, 0.5, 0.0, 0.0, 0.0); // todo: tune this
 
   audioShield.unmuteHeadphone(); // for debugging
 
@@ -618,7 +618,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
               should_flip_y[shifted_x] = !should_flip_y[shifted_x];
               flip_shown[shifted_x] = false;
             } else {
-              if (random(100) < 34) {
+              if (random(100) < 16) {
                 EVERY_N_SECONDS(3) {
                   // TODO: instead of a hard rotate, cycle speeds. 
                   reverse_rotation = !reverse_rotation;
@@ -682,6 +682,8 @@ void mapSpreadOutputsToVisualizerMatrix() {
   frames_since_last_shift++;
   if (frames_since_last_shift >= current_frames_per_shift) {
     frames_since_last_shift = 0;
+
+    // TODO: maybe stay still for a frame if reverse_rotation just changed?
     if (reverse_rotation) {
       shift--;
     } else {
