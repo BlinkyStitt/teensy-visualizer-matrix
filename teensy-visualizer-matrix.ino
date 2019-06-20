@@ -583,7 +583,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
       // we are using height instead of brightness to represent how loud the frequency was
       // so set to max brightness
-      new_color.value = 255;
+      new_color.value = value_visualizer;
 
       flip_shown[x] = true;
       for (uint8_t y = 1; y <= visualizerNumLEDsY - 2; y++) {
@@ -610,6 +610,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
                 // if we hit the top, light both ends white and flip this for the next time
                 visualizer_matrix(shifted_x, 1) = CRGB::White;
+                // TODO: reduce brightness
 
                 should_flip_y[x] = flip_y;
                 flip_shown[x] = false;
@@ -643,7 +644,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
     uint8_t i = x % numSpreadOutputs / ledsPerSpreadOutput;
     uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
 
-    CHSV border_color = CHSV(color_hue, 255, 255);
+    CHSV border_color = CHSV(color_hue, 255, value_visualizer);
 
     visualizer_matrix(shifted_x, 0) = border_color;
     visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = border_color;

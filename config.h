@@ -17,7 +17,7 @@
 #define LED_MODE BGR
 
 // TODO: use volume knob for setting brightness. a light sensor could maybe work
-#define DEFAULT_BRIGHTNESS 70 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
+#define DEFAULT_BRIGHTNESS 52 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
 
 // each frequencyBin = ~43Hz
 const uint16_t minBin = 1;   // skip 0-43Hz. it's too noisy
@@ -66,7 +66,7 @@ const float activate_difference = 2.5 / 6.0;
 // simple % decrease
 const float decayMax = 0.98;  // was .98
 // TODO: not sure i like how this works. i want a more explicit link between this value and how long it takes to fade to black
-const uint8_t value_min = 32;
+const uint8_t value_visualizer = 255;
 const uint8_t fade_rate = 64;
 // set a floor so that decayMax doesn't go too low
 const float minMaxLevel = 0.10 / activate_difference;
