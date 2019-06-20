@@ -561,6 +561,15 @@ void mapSpreadOutputsToVisualizerMatrix() {
     // we take the absolute value because shift might negative
     uint8_t shifted_x = abs((x + shift) % visualizerNumLEDsX);
 
+    // draw a border
+    uint8_t i = x % numSpreadOutputs / ledsPerSpreadOutput;
+    uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
+
+    CHSV border_color = CHSV(color_hue, 255, value_visualizer);
+
+    visualizer_matrix(shifted_x, 0) = border_color;
+    visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = border_color;
+
     if (numSpreadOutputs == visualizerNumLEDsX) {
       new_color = outputsStretched[x];
     } else {
@@ -579,14 +588,14 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // use the value to calculate the height for this color
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
       // TODO: should we do the frequences[...].average_magnitude / local_max calculations here?
-      uint8_t highestIndexToLight = map(new_color.value, 1, 255, 1, visualizerNumLEDsY - 2);
+      uint8_t highestIndexToLight = map(new_color.value, 1, 255, 1, visualizerNumLEDsY - 1);
 
       // we are using height instead of brightness to represent how loud the frequency was
       // so set to max brightness
       new_color.value = value_visualizer;
 
       flip_shown[x] = true;
-      for (uint8_t y = 1; y <= visualizerNumLEDsY - 2; y++) {
+      for (uint8_t y = 1; y <= visualizerNumLEDsY - 1; y++) {
         uint8_t shifted_y = y;
         if (should_flip_y[x]) {
           shifted_y = map_visualizer_y[shifted_y];
@@ -598,7 +607,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
         } else if (y == highestIndexToLight) {
           visualizer_matrix(shifted_x, shifted_y) = CRGB::White;
 
-          if (highestIndexToLight >= visualizerNumLEDsY - 2) {
+          if (highestIndexToLight >= visualizerNumLEDsY - 1) {
             if (random(100) < 50) {
               EVERY_N_SECONDS(3) {
                 // TODO: instead of a hard rotate, cycle speeds. 
@@ -609,7 +618,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
                 flip_y = !flip_y;
 
                 // if we hit the top, light both ends white and flip this for the next time
-                visualizer_matrix(shifted_x, 1) = CRGB::White;
+                visualizer_matrix(shifted_x, 0) = CRGB::White;
                 // TODO: reduce brightness
 
                 should_flip_y[x] = flip_y;
@@ -617,7 +626,8 @@ void mapSpreadOutputsToVisualizerMatrix() {
               }
             }
           }
-        } else {
+        } else if (y < visualizerNumLEDsY - 1) {
+          // fill the rest in black (except the border)
           // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
           // visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
           visualizer_matrix(shifted_x, shifted_y) = CRGB::Black;
@@ -639,15 +649,6 @@ void mapSpreadOutputsToVisualizerMatrix() {
         flip_shown[x] = false;
       }
     }
-
-    // draw a border
-    uint8_t i = x % numSpreadOutputs / ledsPerSpreadOutput;
-    uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
-
-    CHSV border_color = CHSV(color_hue, 255, value_visualizer);
-
-    visualizer_matrix(shifted_x, 0) = border_color;
-    visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = border_color;
   }
 
   frames_since_last_shift++;
