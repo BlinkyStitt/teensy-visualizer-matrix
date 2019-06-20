@@ -584,18 +584,21 @@ void mapSpreadOutputsToVisualizerMatrix() {
       }
     }
 
+    uint8_t lowestIndexToLight = 1;
+
     if (new_color.value > 0) {
       // use the value to calculate the height for this color
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
       // TODO: should we do the frequences[...].average_magnitude / local_max calculations here?
-      uint8_t highestIndexToLight = map(new_color.value, 1, 255, 1, visualizerNumLEDsY - 1);
+      uint8_t lowestIndexToLightWhite = 2;
+      uint8_t highestIndexToLight = map(new_color.value, 1, 255, lowestIndexToLight, visualizerNumLEDsY - 1);
 
       // we are using height instead of brightness to represent how loud the frequency was
       // so set to max brightness
       new_color.value = value_visualizer;
 
       flip_shown[x] = true;
-      for (uint8_t y = 1; y <= visualizerNumLEDsY - 1; y++) {
+      for (uint8_t y = lowestIndexToLight; y <= visualizerNumLEDsY - 1; y++) {
         uint8_t shifted_y = y;
         if (should_flip_y[x]) {
           shifted_y = map_visualizer_y[shifted_y];
@@ -605,7 +608,12 @@ void mapSpreadOutputsToVisualizerMatrix() {
           // simple color bar
           visualizer_matrix(shifted_x, shifted_y) = new_color;
         } else if (y == highestIndexToLight) {
-          visualizer_matrix(shifted_x, shifted_y) = CRGB::White;
+          // very short bars shouldn't have any white
+          if (highestIndexToLight <= lowestIndexToLightWhite) {
+            visualizer_matrix(shifted_x, shifted_y) = new_color;
+          } else {
+            visualizer_matrix(shifted_x, shifted_y) = CRGB::White;
+          }
 
           if (highestIndexToLight >= visualizerNumLEDsY - 1) {
             if (random(100) < 50) {
@@ -638,7 +646,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
       // if new_color is black or close to it, we fade rather then set to black
       // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
-      for (uint8_t y = 1; y < numLEDsY - 1; y++) {
+      for (uint8_t y = lowestIndexToLight; y < numLEDsY - 1; y++) {
         // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
         visualizer_matrix(shifted_x, y) = CRGB::Black;
       }
