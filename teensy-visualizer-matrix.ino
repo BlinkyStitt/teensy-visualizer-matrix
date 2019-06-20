@@ -401,18 +401,15 @@ void updateFrequencyColors() {
       float alphaScale = 1.0;
       uint8_t ema = (alpha * reading + (alphaScale - alpha) * lastOutput) / alphaScale;
 
-      // TODO: modify ema such that its harder to get to the top
+      uint8_t lastOutputDecreased = frequencyColors[i].value * decayMax - fade_rate;
 
       uint8_t color_value;
-      if (ema > frequencyColors[i].value) {
-        // if the magnitude is increasing, just set it to the ema
+      if (ema > lastOutputDecreased) {
+        // if the magnitude is increasing, or only a little less than the current value set it to the ema
         color_value = ema;
       } else {
-        // if the magnitude is decreasing...
-        uint8_t lastOutputDecreased = frequencyColors[i].value * decayMax - fade_rate;
-        uint8_t emaDecreased = ema - fade_rate / 2;
-
-        color_value = max(lastOutputDecreased, emaDecreased);
+        // if the magnitude is decreasing, decrease at a fixed rate
+        color_value = lastOutputDecreased;
       }
 
       // TODO: should we have value_min here?
@@ -565,16 +562,16 @@ void mapSpreadOutputsToVisualizerMatrix() {
     uint8_t shifted_x = abs((x + shift) % visualizerNumLEDsX);
 
     if (numSpreadOutputs == visualizerNumLEDsX) {
-      new_color = outputsStretched[shifted_x];
+      new_color = outputsStretched[x];
     } else {
       // numFreqBands can be bigger or smaller than numOutputs
       // TODO: test this with large and small values of numSpreadOutputs vs numLEDs
       if (numSpreadOutputs < visualizerNumLEDsX) {
         // simple repeat of the pattern
-        new_color = outputsStretched[shifted_x % numSpreadOutputs];
+        new_color = outputsStretched[x % numSpreadOutputs];
       } else {
         // pattern is larger than numLEDs
-        new_color = outputsStretched[shifted_x % visualizerNumLEDsX];
+        new_color = outputsStretched[x % visualizerNumLEDsX];
       }
     }
 
@@ -588,18 +585,18 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // so set to max brightness
       new_color.value = 255;
 
-      flip_shown[shifted_x] = true;
+      flip_shown[x] = true;
       for (uint8_t y = 1; y <= visualizerNumLEDsY - 2; y++) {
         uint8_t shifted_y = y;
-        if (should_flip_y[shifted_x]) {
+        if (should_flip_y[x]) {
           shifted_y = map_visualizer_y[shifted_y];
         }
 
         if (y < highestIndexToLight) {
           // simple color bar
-          visualizer_matrix(x, shifted_y) = new_color;
+          visualizer_matrix(shifted_x, shifted_y) = new_color;
         } else if (y == highestIndexToLight) {
-          visualizer_matrix(x, shifted_y) = CRGB::White;
+          visualizer_matrix(shifted_x, shifted_y) = CRGB::White;
 
           if (highestIndexToLight >= visualizerNumLEDsY - 2) {
             if (random(100) < 50) {
@@ -612,17 +609,17 @@ void mapSpreadOutputsToVisualizerMatrix() {
                 flip_y = !flip_y;
 
                 // if we hit the top, light both ends white and flip this for the next time
-                visualizer_matrix(x, 1) = CRGB::White;
+                visualizer_matrix(shifted_x, 1) = CRGB::White;
 
-                should_flip_y[shifted_x] = flip_y;
-                flip_shown[shifted_x] = false;
+                should_flip_y[x] = flip_y;
+                flip_shown[x] = false;
               }
             }
           }
         } else {
           // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
           // visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
-          visualizer_matrix(x, shifted_y) = CRGB::Black;
+          visualizer_matrix(shifted_x, shifted_y) = CRGB::Black;
         }
       }
     } else {
@@ -632,24 +629,24 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
       for (uint8_t y = 1; y < numLEDsY - 1; y++) {
         // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
-        visualizer_matrix(x, y) = CRGB::Black;
+        visualizer_matrix(shifted_x, y) = CRGB::Black;
       }
 
-      if (flip_shown[shifted_x]) {
+      if (flip_shown[x]) {
         // we used to have a mode that would toggle, but i like two modes more
-        should_flip_y[shifted_x] = flip_y;
-        flip_shown[shifted_x] = false;
+        should_flip_y[x] = flip_y;
+        flip_shown[x] = false;
       }
     }
 
     // draw a border
-    uint8_t i = shifted_x % numSpreadOutputs / ledsPerSpreadOutput;
+    uint8_t i = x % numSpreadOutputs / ledsPerSpreadOutput;
     uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
 
     CHSV border_color = CHSV(color_hue, 255, 255);
 
-    visualizer_matrix(x, 0) = border_color;
-    visualizer_matrix(x, visualizerNumLEDsY - 1) = border_color;
+    visualizer_matrix(shifted_x, 0) = border_color;
+    visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = border_color;
   }
 
   frames_since_last_shift++;

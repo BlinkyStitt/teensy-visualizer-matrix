@@ -56,11 +56,13 @@ uint16_t frames_per_shift[] = {
   // slow speed
   uint16_t(seconds_for_slow_rotation * 1000.0 / float(numLEDsX) / ms_per_frame + 0.5),
   // ludicrous speed
-  4,
+  3,
+  // full throttle
+  1,
 };
 
 // how close a sound has to be to the loudest sound in order to activate
-const float activate_difference = 2.1 / 6.0;
+const float activate_difference = 2.5 / 6.0;
 // simple % decrease
 const float decayMax = 0.98;  // was .98
 // TODO: not sure i like how this works. i want a more explicit link between this value and how long it takes to fade to black
