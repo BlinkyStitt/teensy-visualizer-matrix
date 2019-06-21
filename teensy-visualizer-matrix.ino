@@ -121,6 +121,8 @@ void setupFFTBins() {
 
   e = FindE(numFreqBands, minBin, maxBin); // Find calculated E value
 
+  // TODO: find multiple values for different minBin and maxBins. Then if we detect that there is no bass or no highs, we can spread our limited colors over just the activate frequences
+
   if (e) {                           // If a value was returned continue
     Serial.printf("E = %4.4f\n", e); // Print calculated E value
     Serial.printf("  i  low high\n");
@@ -131,7 +133,7 @@ void setupFFTBins() {
       Serial.printf("%3d ", b);
 
       Serial.printf("%4d ", count); // Print low bin
-      freqBands[b] = count;
+      freqBands[b] = count;  // Save the low bin to a global
 
       count += d - 1;
       Serial.printf("%4d\n", count); // Print high bin
@@ -248,6 +250,17 @@ void setupAudio() {
   }
 }
 
+void setupRandom() {
+  randomSeed(analogRead(3));
+
+#ifdef DEBUG
+  Serial.println(random(100));
+  Serial.println(random(100));
+  Serial.println(random(100));
+  Serial.println(random(100));
+#endif
+}
+
 void setup() {
   debug_serial(115200, 2000);
 
@@ -268,12 +281,7 @@ void setup() {
 
   setupFFTBins();
 
-  randomSeed(analogRead(3));
-
-  Serial.println(random(100));
-  Serial.println(random(100));
-  Serial.println(random(100));
-  Serial.println(random(100));
+  setupRandom();
 
   Serial.println("Starting...");
 }
@@ -383,6 +391,7 @@ void updateFrequencyColors() {
       // HSV makes it easy to cycle through the rainbow
       // TODO: color-blind color pallete
       // map(value, fromLow, fromHigh, toLow, toHigh)
+      // TODO: fastLED has a map8 function or something like that that i think is faster and meant for this
       uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
 
       // use 255 as the max brightness. if that is too bright, FastLED.setBrightness can be changed in setup to reduce
@@ -402,6 +411,7 @@ void updateFrequencyColors() {
       float alphaScale = 1.0;
       uint8_t ema = (alpha * reading + (alphaScale - alpha) * lastOutput) / alphaScale;
 
+      // TODO: make sure this doesn't wrap
       uint8_t lastOutputDecreased = frequencyColors[i].value * decayMax - fade_rate;
 
       uint8_t color_value;
@@ -413,8 +423,7 @@ void updateFrequencyColors() {
         color_value = lastOutputDecreased;
       }
 
-      // TODO: should we have value_min here?
-      // TODO! do a more interesting curve. though i like the look of each light taking the same amount of time to turn off
+      // we used to use value_min here, but it was making the quiet bars too tall 
       color_value = constrain(color_value, 0, 255);
 
       // TODO: what saturation?
@@ -564,6 +573,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
     // draw a border
     uint8_t i = x % numSpreadOutputs / ledsPerSpreadOutput;
+    // TODO: use fastLED function instead of map
     uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
 
     CHSV border_color = CHSV(color_hue, 255, value_visualizer);
