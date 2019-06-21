@@ -165,12 +165,13 @@ void setupLights() {
 
   // with software spi, for one panel, 2mhz worked. when a second panel was added, 2mhz crashed after a few seconds, but 1mhz is working on my test code. crashed after a second or so though 
   // looks like 500 mhz can run 2 panels, but we are having power troubles now. more power might mean we can increase the rate
-  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(1500)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+  // with 5.0v over usb, i can only run at 1500kHz
+  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(2000)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
 
   // TODO: what should this be set to? the flexible panels are much larger
   // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
-  // FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 5 * 1000 * 2);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
+  FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 5 * 1000);
+  // FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
 
   FastLED.setBrightness(DEFAULT_BRIGHTNESS); // TODO: read this from the SD card. or allow tuning with the volume knob
 

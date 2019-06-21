@@ -17,7 +17,7 @@
 #define LED_MODE BGR
 
 // TODO: use volume knob for setting brightness. a light sensor could maybe work
-#define DEFAULT_BRIGHTNESS 52 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
+#define DEFAULT_BRIGHTNESS 64 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
 
 // each frequencyBin = ~43Hz
 const uint16_t minBin = 1;   // skip 0-43Hz. it's too noisy
