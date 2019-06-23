@@ -168,7 +168,8 @@ void setupLights() {
   // with software spi, for one panel, 2mhz worked. when a second panel was added, 2mhz crashed after a few seconds, but 1mhz is working on my test code. crashed after a second or so though 
   // looks like 500 mhz can run 2 panels, but we are having power troubles now. more power might mean we can increase the rate
   // with 5.0v over usb, i can only run at 1500kHz
-  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(2000)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+  // TODO: it was working well at 2000kHz until the battery ran down, then i lowered the rate and it worked. when i put a new battery in, it crashed though
+  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(1500)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
 
   // TODO: what should this be set to? the flexible panels are much larger
   // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
@@ -207,22 +208,16 @@ void setupLights() {
 
   Serial.println("Showing green...");
   colorPattern(CRGB::Green);
-  // TODO: fastled.delay is sending refreshes too quickly and crashing
-  // FastLED.show();
-  // delay(1500);
   FastLED.delay(1500);
 
   Serial.println("Showing blue...");
   colorPattern(CRGB::Blue);
-  // TODO: fastled.delay is sending refreshes too quickly and crashing
-  // FastLED.show();
-  // delay(1500);
   FastLED.delay(1500);
 }
 
 void setupAudio() {
   // Audio requires memory to work. I haven't seen this go over 11
-  AudioMemory(11);
+  AudioMemory(12);
 
   // Enable the audio shield and set the output volume.
   audioShield.enable();
@@ -541,6 +536,9 @@ void mapSpreadOutputsToVisualizerMatrix() {
   static uint8_t current_frames_per_shift = frames_per_shift[frames_per_shift_index];
   // static unsigned long next_change_frames_per_shift = 0;
 
+  static uint8_t lowestIndexToLight = 1;
+  static uint8_t lowestIndexToLightWhite = 4;
+
   // TODO: every X seconds change the frames_per_shift
   // if (millis() >= next_change_frames_per_shift) {
   //   frames_per_shift_index++;
@@ -595,13 +593,10 @@ void mapSpreadOutputsToVisualizerMatrix() {
       }
     }
 
-    uint8_t lowestIndexToLight = 1;
-
     if (new_color.value > 0) {
       // use the value to calculate the height for this color
       // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
       // TODO: should we do the frequences[...].average_magnitude / local_max calculations here?
-      uint8_t lowestIndexToLightWhite = 2;
       uint8_t highestIndexToLight = map(new_color.value, 1, 255, lowestIndexToLight, visualizerNumLEDsY - 1);
 
       // we are using height instead of brightness to represent how loud the frequency was
@@ -620,7 +615,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
           visualizer_matrix(shifted_x, shifted_y) = new_color;
         } else if (y == highestIndexToLight) {
           // very short bars shouldn't have any white
-          if (highestIndexToLight <= lowestIndexToLightWhite) {
+          if (y < lowestIndexToLightWhite) {
             visualizer_matrix(shifted_x, shifted_y) = new_color;
           } else {
             visualizer_matrix(shifted_x, shifted_y) = CRGB::White;
