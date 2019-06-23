@@ -521,7 +521,8 @@ void mapSpreadOutputsToVisualizerMatrix() {
   // TODO: the top pixels are flickering a lot, too. maybe we need minOnMs here instead of earlier?
   static uint16_t shift = 0;
   static uint16_t frames_since_last_shift = 0;
-  
+
+
   // TODO: should this be static?
   static CHSV new_color;
 
@@ -539,6 +540,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
   static uint8_t lowestIndexToLight = 1;
   static uint8_t lowestIndexToLightWhite = 4;
 
+  // OPTION 1: cycle frames_per_shift every X seconds
   // TODO: every X seconds change the frames_per_shift
   // if (millis() >= next_change_frames_per_shift) {
   //   frames_per_shift_index++;
@@ -546,14 +548,23 @@ void mapSpreadOutputsToVisualizerMatrix() {
   //   if (frames_per_shift_index >= 2) {
   //     frames_per_shift_index = 0;
   //   }
-
   //   // TODO: different lengths for different modes
   //   // TODO: have a struct for this
   //   next_change_frames_per_shift = millis() + 3000;
   // }
-
   // // TODO: do an interesting curve on current_frames_per_shift to head towards frames_per_shift[frames_per_shift_index]. ema might work for now
   // current_frames_per_shift = frames_per_shift[frames_per_shift_index];
+
+  // OPTION 2: oscillate frames_per_shift between a slow and a fast speed
+  // static uint16_t loud_frame_counter = 0;
+  // bool increment_loud_frame_counter = false;
+  // current_frames_per_shift = map(cubicwave8(loud_frame_counter), 0, 255, frames_per_shift[0], frames_per_shift[2]);
+  // Serial.print("frames_per_shift: ");
+  // Serial.println(current_frames_per_shift);
+
+  // OPTION 3: if loud_frame_counter was incremented multiple times in one frame, have a chance to rotate once at high speed instead of changing direction
+
+  // TODO: if we are going too fast for too long, slow down
 
   if (new_pattern) {
     for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
@@ -622,6 +633,9 @@ void mapSpreadOutputsToVisualizerMatrix() {
           }
 
           if (highestIndexToLight >= visualizerNumLEDsY - 1) {
+            // loud_frame_counter++;
+            // increment_loud_frame_counter = true;
+
             if (random(100) < 50) {
               EVERY_N_SECONDS(3) {
                 // TODO: instead of a hard rotate, cycle speeds. 
@@ -664,6 +678,10 @@ void mapSpreadOutputsToVisualizerMatrix() {
       }
     }
   }
+
+  // if (increment_loud_frame_counter) {
+  //   loud_frame_counter++;
+  // }
 
   frames_since_last_shift++;
   if (frames_since_last_shift >= current_frames_per_shift) {
