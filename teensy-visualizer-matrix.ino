@@ -26,10 +26,10 @@ uint16_t freqBands[numFreqBands];
 // keep track of the max volume for each frequency band (slowly decays)
 struct frequency {
   float current_magnitude;
-  float average_magnitude;
+  // float average_magnitude;
   float max_magnitude;
 };
-frequency frequencies[numFreqBands] = {0, 0, 0};
+frequency frequencies[numFreqBands] = {0, 0};
 
 CHSV frequencyColors[numFreqBands];
 
@@ -522,7 +522,6 @@ void mapSpreadOutputsToVisualizerMatrix() {
   static uint16_t shift = 0;
   static uint16_t frames_since_last_shift = 0;
 
-
   // TODO: should this be static?
   static CHSV new_color;
 
@@ -640,6 +639,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
               EVERY_N_SECONDS(3) {
                 // TODO: instead of a hard rotate, cycle speeds. 
                 reverse_rotation = !reverse_rotation;
+                frames_since_last_shift = current_frames_per_shift;
               }
             } else {
               EVERY_N_SECONDS(3) {
@@ -672,7 +672,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
       }
 
       if (flip_shown[x]) {
-        // we used to have a mode that would toggle, but i like two modes more
+        // we used to have a mode that would cycle, but i like toggling between two modes more
         should_flip_y[x] = flip_y;
         flip_shown[x] = false;
       }
