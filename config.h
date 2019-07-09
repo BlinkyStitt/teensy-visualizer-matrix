@@ -9,12 +9,22 @@
 #define SPI_SCK_PIN 14  // alt pin for use with audio board
 // TODO: pin to check battery level?
 
+// APA102 matrix
 // TODO: MATRIX_CS_PIN if we plan on actually using the SD card
-#define MATRIX_CLOCK_PIN 0  // yellow wire on my dotstars
-#define MATRIX_DATA_PIN 1  // green wire on my dotstars
-
+// with pins 0/1, this drew a single frame in 8ms
+// with pins 14/7, this drew a single frame in 11ms
+#define MATRIX_CLOCK_PIN SPI_SCK_PIN  // yellow wire on my dotstars
+#define MATRIX_DATA_PIN SPI_MOSI_PIN  // green wire on my dotstars
 #define LED_CHIPSET APA102
 #define LED_MODE BGR
+#define LED_DATA_RATE_KHZ 4000
+const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
+
+// neopixel matrix
+// TODO: make sure FASTLED_ALLOW_INTERRUPTS is 0 when using neopixels
+// #define MATRIX_DATA_PIN 7
+// #define LED_CHIPSET NEOPIXEL
+// const float ms_per_frame = 23.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 
 // TODO: use volume knob for setting brightness. a light sensor could maybe work
 // TODO: or maybe just have a button to toggle between day and night brightness
@@ -40,8 +50,6 @@ const uint8_t numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
 const uint8_t visualizerNumLEDsX = numSpreadOutputs;
 const uint8_t visualizerNumLEDsY = numLEDsY;
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
-
-const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
 
 // the shortest amount of time to leave an output on before starting to change it
 // it will stay on longer than this depending on time required to dim to off
