@@ -4,6 +4,7 @@
 
 // TODO: not sure about this
 // #define FASTLED_ALLOW_INTERRUPTS 0
+// #define FASTLED_INTERRUPT_RETRY_COUNT 1
 
 #include <stdlib.h>
 
@@ -169,8 +170,8 @@ void setupLights() {
   // looks like 500 mhz can run 2 panels, but we are having power troubles now. more power might mean we can increase the rate
   // with 5.0v over usb, i can only run at 1500kHz
   // TODO: it was working well at 2000kHz until the battery ran down, then i lowered the rate and it worked. when i put a new battery in, it crashed though
-  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(LED_DATA_RATE_KHZ)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
-  // FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+  // FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(LED_DATA_RATE_KHZ)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
 
   // TODO: what should this be set to? the flexible panels are much larger
   // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
