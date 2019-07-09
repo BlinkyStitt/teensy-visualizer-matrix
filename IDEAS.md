@@ -28,9 +28,14 @@ have 3 layers. bottom-up in front, sprites in the middle, top-down in back
 
 have a ball with collision. maybe as it moves through a white light it speeds up or reverses direction depending on each object's direction.
 
-- same direction -> accelerate
-- different direction -> bounce
+1. draw the visualizer
+2. draw the sprites
+3. check the overlap of the ball sprite and the visualizer and set move speed for next frame of the sprite
+    - for each white light that the sprite is overlapping, increase XC with SetXChange
+    - if no white lights under the sprite, decrease XC with SetXChange
 
 or maybe the ball should move a constant direction. white leds speed up the ball. if not speed up, slow down
 
 if we flip direction, should we reset the frames_per_shift counter to 0 or max?
+
+have no bars. have where the white light is be the spawn point for a firework sprite
