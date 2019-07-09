@@ -1,10 +1,6 @@
 #define DEBUG
-#define DEBUG_SERIAL_WAIT
+// #define DEBUG_SERIAL_WAIT
 #include "bs_debug.h"
-
-// TODO: not sure about this
-// #define FASTLED_ALLOW_INTERRUPTS 0
-// #define FASTLED_INTERRUPT_RETRY_COUNT 1
 
 #include <stdlib.h>
 
