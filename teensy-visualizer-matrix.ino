@@ -734,40 +734,38 @@ void loop() {
     new_frame = true;
   }
 
-  // TODO: draw text/sprites and set new_frame=true
+  // TODO: EVERY_N_MILLIS(...) { draw text/sprites and set new_frame=true }
 
   if (new_frame) {
-    // TODO: time this
-    combineMatrixes();
-
     new_frame = false;
 
+    combineMatrixes();
+
+    // the time to draw the audio/text/sprite is variable
     loop_duration = millis() - loop_duration;
-    // TODO: not sure what this if should actually be
-    if (loop_duration + draw_ms < ms_per_frame) {
-      // using FastLED's delay allows for dithering
-      // TODO: calculate the delay to get an even framerate now that show takes an uneven amount of time. (13-15ms)
-      // TODO: with software spi, fastled.delay was sending refreshes too quickly and crashing. try with hardware
-      // delay calls FastLED.show multiple times. since we had to reduce bandwidth, this takes time that we subtract from our delay
-      long delay = ms_per_frame - loop_duration - draw_ms;
+
+    // Serial.print("loop duration: ");
+    // Serial.println(loop_duration);
+
+    // using FastLED's delay allows for dithering
+    // delay calls FastLED.show multiple times. since we had to reduce bandwidth, this takes noticable time that we subtract from our delay
+    long delay = ms_per_frame - loop_duration - draw_ms;
+    if (delay > 0) {
       // Serial.print("Delaying for ");
-      // Serial.println(delay);
+      // Serial.println(delay + draw_ms);
 
-      if (delay >= 0) {
-        // Serial.println("all good");
-        FastLED.delay(delay);
-      } else {
-        Serial.print("Running slow 1! duration: ");
-        Serial.print(loop_duration);
-        Serial.print("; delay: ");
-        Serial.println(delay);
-        FastLED.show();
-      }
+      // long actual_delay = millis();
 
-      // TODO: use a regular delay here to keep the framerate slower?
+      FastLED.delay(delay);
+
+      // actual_delay = millis() - actual_delay;
+
+      // Serial.print("actual delay: ");
+      // Serial.println(actual_delay);
     } else {
-      Serial.print("Running slow 2! duration: ");
-      Serial.println(loop_duration);
+      Serial.print("Running slow! ");
+      Serial.println(delay);
+
       FastLED.show();
     }
   }

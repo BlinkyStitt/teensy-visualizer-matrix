@@ -27,6 +27,7 @@
 #define MATRIX_DATA_PIN SPI_MOSI_PIN
 #define LED_CHIPSET NEOPIXEL
 const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
+// TODO: this needs to be some multiple of 
 // TODO: instead of connecting data lines on neopixels, dupe the outputs
 const uint8_t numLEDsX = 32;
 const uint8_t numLEDsY = 8;
