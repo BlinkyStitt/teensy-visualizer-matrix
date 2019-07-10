@@ -166,8 +166,13 @@ void setupLights() {
   // looks like 500 mhz can run 2 panels, but we are having power troubles now. more power might mean we can increase the rate
   // with 5.0v over usb, i can only run at 1500kHz
   // TODO: it was working well at 2000kHz until the battery ran down, then i lowered the rate and it worked. when i put a new battery in, it crashed though
-  // FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(LED_DATA_RATE_KHZ)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+#ifdef LED_DATA_RATE_KHZ
+  Serial.println("Setting up dotstars...");
+  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(LED_DATA_RATE_KHZ)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+#else
+  Serial.println("Setting up neopixels...");
   FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+#endif
 
   // TODO: what should this be set to? the flexible panels are much larger
   // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
@@ -747,24 +752,30 @@ void loop() {
     // Serial.print("loop duration: ");
     // Serial.println(loop_duration);
 
-    // using FastLED's delay allows for dithering
-    // delay calls FastLED.show multiple times. since we had to reduce bandwidth, this takes noticable time that we subtract from our delay
-    long delay = ms_per_frame - loop_duration - draw_ms;
-    if (delay > 0) {
+    // using FastLED's delay allows for dithering by calling FastLED.show multiple times
+    // showing can take a noticable time (especially with a reduced bandwidth) that we subtract from our delay
+    long draw_delay = ms_per_frame - loop_duration - draw_ms;
+    if (draw_delay > long(draw_ms)) {
       // Serial.print("Delaying for ");
-      // Serial.println(delay + draw_ms);
+      // Serial.println(draw_delay + draw_ms);
 
-      // long actual_delay = millis();
+      unsigned long actual_delay = millis();
 
-      FastLED.delay(delay);
+      FastLED.delay(draw_delay);
 
-      // actual_delay = millis() - actual_delay;
+      actual_delay = millis() - actual_delay;
 
       // Serial.print("actual delay: ");
       // Serial.println(actual_delay);
+
+      // TODO: does delaying like this to keep an even framerate make sense?
+      if (actual_delay < draw_delay + draw_ms) {
+        // Serial.println("framerate fix delay...");
+        delay(draw_delay + draw_ms - actual_delay);
+      }
     } else {
-      Serial.print("Running slow! ");
-      Serial.println(delay);
+      // Serial.print("Running too slow for delay! ");
+      // Serial.println(draw_delay);
 
       FastLED.show();
     }
