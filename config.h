@@ -39,7 +39,8 @@ const uint8_t numLEDsY = 8;
 
 // each frequencyBin = ~43Hz
 const uint16_t minBin = 0;   // TODO: skip 0-43Hz by starting at 1? 0 is rather noisy
-const uint16_t maxBin = 372; // skip over 16kHz
+// const uint16_t maxBin = 372; // skip over 16kHz
+const uint16_t maxBin = 418; // skip over 18kHz
 
 const uint8_t numOutputs = 16; // this needs to fit into a 64 wide matrix
 const uint8_t numFreqBands = numOutputs;  // this will grow/shrink to fit inside numOutput. TODO: what should this be? maybe just do 8
