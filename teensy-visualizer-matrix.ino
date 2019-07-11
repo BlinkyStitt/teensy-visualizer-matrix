@@ -506,7 +506,6 @@ void mapSpreadOutputsToVisualizerMatrix() {
   static uint16_t map_visualizer_y[visualizerNumLEDsY] = {0};
   static bool flip_y = false;
   static bool new_pattern = true;
-  static bool flip_shown[visualizerNumLEDsX] = {false};
   static bool reverse_rotation = true;
   static uint8_t frames_per_shift_index = 0;
   static uint8_t current_frames_per_shift = frames_per_shift[frames_per_shift_index];
@@ -589,7 +588,6 @@ void mapSpreadOutputsToVisualizerMatrix() {
       // so set to max brightness
       new_color.value = value_visualizer;
 
-      flip_shown[x] = true;
       for (uint8_t y = lowestIndexToLight; y <= visualizerNumLEDsY - 1; y++) {
         uint8_t shifted_y = y;
         if (should_flip_y[x]) {
@@ -600,10 +598,11 @@ void mapSpreadOutputsToVisualizerMatrix() {
           // simple color bar
           visualizer_matrix(shifted_x, shifted_y) = new_color;
         } else if (y == highestIndexToLight) {
-          // very short bars shouldn't have any white
           if (y < lowestIndexToLightWhite) {
+            // very short bars shouldn't have any white at the top
             visualizer_matrix(shifted_x, shifted_y) = new_color;
           } else {
+            // taller bars should have white at the top
             visualizer_matrix(shifted_x, shifted_y) = CRGB::White;
           }
 
@@ -619,14 +618,10 @@ void mapSpreadOutputsToVisualizerMatrix() {
               }
             } else {
               EVERY_N_SECONDS(3) {
-                flip_y = !flip_y;
-
                 // if we hit the top, light both ends white and flip this for the next time
                 visualizer_matrix(shifted_x, 0) = CRGB::White;
-                // TODO: reduce brightness
 
-                should_flip_y[x] = flip_y;
-                flip_shown[x] = false;
+                flip_y = should_flip_y[x] = !should_flip_y[x];
               }
             }
           }
@@ -640,18 +635,14 @@ void mapSpreadOutputsToVisualizerMatrix() {
     } else {
       // it should be off
 
-      // if new_color is black or close to it, we fade rather then set to black
-      // TODO: this doesn't look good. fade the top led until it is off, and then move on to the next instead of fading all equally
       for (uint8_t y = lowestIndexToLight; y < numLEDsY - 1; y++) {
         // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
         visualizer_matrix(shifted_x, y) = CRGB::Black;
       }
 
-      if (flip_shown[x]) {
-        // we used to have a mode that would cycle, but i like toggling between two modes more
-        should_flip_y[x] = flip_y;
-        flip_shown[x] = false;
-      }
+      // follow the loudest sound
+      // TODO: do this in a seperate loop so that flip_y is the same for all entries?
+      should_flip_y[x] = flip_y;
     }
   }
 
