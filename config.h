@@ -36,7 +36,7 @@ const uint8_t numLEDsY = 8;
 // TODO: or maybe just have a button to toggle between day and night brightness
 // 52 the battery lasted 4.5 hours
 // 32 the battery lasted 6 hours
-#define DEFAULT_BRIGHTNESS 24 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
+#define DEFAULT_BRIGHTNESS 32 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
 
 // each frequencyBin = ~43Hz
 const uint16_t minBin = 0;   // TODO: skip 0-43Hz by starting at 1? 0 is rather noisy
@@ -67,7 +67,7 @@ const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 33
 float seconds_for_slow_rotation = 42;
 uint16_t frames_per_shift[] = {
   // maximum speed (no seizure speed)
-  uint16_t(minOnMs / ms_per_frame + 0.5),
+  uint16_t(1.5 * minOnMs / ms_per_frame + 0.5),
   // slow speed
   uint16_t(seconds_for_slow_rotation * 1000.0 / float(numLEDsX) / ms_per_frame + 0.5),
   // ludicrous speed
@@ -79,9 +79,9 @@ uint16_t frames_per_shift[] = {
 // how close a sound has to be to the loudest sound in order to activate
 const float activate_difference = 2.5 / 6.0;
 // simple % decrease
-const float decayMax = 0.98;  // was .98
+const float decayMax = 0.98;
 // TODO: not sure i like how this works. i want a more explicit link between this value and how long it takes to fade to black
 const uint8_t value_visualizer = 255;
 const uint8_t fade_rate = 64;
 // set a floor so that decayMax doesn't go too low
-const float minMaxLevel = 0.10 / activate_difference;
+const float minMaxLevel = 0.15 / activate_difference;

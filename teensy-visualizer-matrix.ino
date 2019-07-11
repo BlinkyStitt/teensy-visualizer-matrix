@@ -57,9 +57,6 @@ AudioConnection patchCord1(i2s1, 0, i2s2, 0);
 AudioConnection patchCord2(i2s1, 0, fft1024, 0);
 AudioControlSGTL5000 audioShield; // xy=366,225
 
-// going through the levels loudest to quietest makes it so we can ensure the loudest get turned on ASAP
-int sortedLevelIndex[numFreqBands];
-
 // keep track of when to turn lights off so they don't flicker
 unsigned long turnOnMsArray[numFreqBands];
 unsigned long turnOffMsArray[numFreqBands];
@@ -68,18 +65,6 @@ unsigned long turnOffMsArray[numFreqBands];
 unsigned long draw_ms = 8;
 unsigned long lastUpdate = 0;
 unsigned long lastDraw = 0;
-
-/* sort the levels normalized against their max
- *
- * with help from https://phoxis.org/2012/07/12/get-sorted-index-orderting-of-an-array/
- * 
- * TODO: i don't love how this needs globals. it also should be comparing with global max instead of the local max
- */
-static int compare_levels(const void *a, const void *b) {
-  // TODO: check for uint16_t to int overflow issues
-  int aa = *((int *)a), bb = *((int *)b);
-  return (frequencies[bb].current_magnitude / frequencies[bb].max_magnitude) - (frequencies[aa].current_magnitude / frequencies[aa].max_magnitude);
-}
 
 float FindE(uint16_t bands, uint16_t minBin, uint16_t maxBin) {
   // https://forum.pjrc.com/threads/32677-Is-there-a-logarithmic-function-for-FFT-bin-selection-for-any-given-of-bands?p=133842&viewfull=1#post133842
@@ -241,11 +226,6 @@ void setupAudio() {
   // audioShield.eqBands(0.5, 0.5, 0.0, 0.0, 0.0); // todo: tune this
 
   audioShield.unmuteHeadphone(); // for debugging
-
-  // setup array for sorting
-  for (uint16_t i = 0; i < numFreqBands; i++) {
-    sortedLevelIndex[i] = i;
-  }
 }
 
 void setupRandom() {
@@ -347,44 +327,15 @@ void updateFrequencyColors() {
   // read FFT frequency data into a bunch of levels. assign each level a color and a brightness
   float overall_max = updateLevelsFromFFT();
 
-  // turn off any quiet levels. we do this before turning any lights on so that our loudest frequencies are most
-  // responsive
   for (uint16_t i = 0; i < numFreqBands; i++) {
-    // TODO: not sure that activate_difference is what we want here. this is probably broken since we changed how levels are saved
-    if (frequencyColors[i].value == 0) {
-      // this light is already off
-      continue;
-    }
-
-    // turn off if current level is less than the activation threshold
-    // TODO: i thought i wanted "if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude / local_max < activate_difference) {"
-    if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude < overall_max * activate_difference) {
-      // the output has been on for at least minOnMs and is quiet now
-      // if it is on, dim it quickly to off
-
-      // TODO: i dont think this does exactly what we want here. we divide value by max. go back to using fade_factor?
-      frequencies[i].max_magnitude *= decayMax;
-
-      // reduce the brightness at 2x the rate we reduce max level
-      // we were using "video" scaling to fade (meaning: never fading to full black), but CHSV doesn't have a fadeLightBy method
-      // frequencyColors[i].fadeLightBy(int((1.0 - decayMax) * 4.0 * 255));
-      // TODO: should the brightness be tied to the currentLevel somehow? that might make it too random looking but now that we have better height calculations, maybe it should
-      frequencyColors[i].value *= decayMax;
-      frequencyColors[i].value *= decayMax;
-    }
-  }
-
-  // sort the levels normalized against their max
-  // this allows us to prioritize turning on for the loudest sounds
-  qsort(sortedLevelIndex, numFreqBands, sizeof(float), compare_levels);
-
-  // turn on up to maxOn loud levels in order of loudest to quietest
-  for (uint16_t j = 0; j < numFreqBands; j++) {
-    uint16_t i = sortedLevelIndex[j];
-
-    // check if current is close to the last max (also check the neighbor maxLevels)
+    // check if current magnitude is close to the max magnitude
     // TODO: i thought i wanted "if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude / local_max >= activate_difference) {"
-    if (millis() >= turnOnMsArray[i] && frequencies[i].current_magnitude >= overall_max * activate_difference) {
+    if (frequencies[i].current_magnitude >= overall_max * activate_difference) {
+      if (millis() < turnOnMsArray[i]) {
+        // nevermind! we need to wait longer to reduce flicker
+        continue;
+      }
+
       // https://github.com/FastLED/FastLED/wiki/FastLED-HSV-Colors#color-map-rainbow-vs-spectrum
       // HSV makes it easy to cycle through the rainbow
       // TODO: color-blind color pallete
@@ -421,16 +372,38 @@ void updateFrequencyColors() {
         color_value = lastOutputDecreased;
       }
 
-      // we used to use value_min here, but it was making the quiet bars too tall 
-      color_value = constrain(color_value, 0, 255);
-
-      // TODO: what saturation?
+      // hue matches the frequency
+      // max saturation
+      // value matches the magnitude for the frequency
       frequencyColors[i] = CHSV(color_hue, 255, color_value);
 
       // make sure we stay on for a minimum amount of time. this prevents flickering if the magnitude changes quickly
-      // TODO: i still think something with an exponential moving average might be better
       turnOnMsArray[i] = millis() + minOnMs / 2.1;
       turnOffMsArray[i] = millis() + minOnMs;
+    } else {  // if (frequencies[i].current_magnitude < overall_max * activate_difference)
+      // the current magnitude is not close to the max magnitude. turn it down if we have waited long enough
+
+      if (millis() < turnOffMsArray[i]) { 
+        // nevermind! we need to wait longer to reduce flicker
+        continue;
+      }
+
+      // TODO: i dont think this does exactly what we want here. we divide value by max. go back to using fade_factor?
+      frequencies[i].max_magnitude *= decayMax;
+
+      if (frequencyColors[i].value == 0) {
+        // this light is already off
+        continue;
+      }
+ 
+      // the output has been on for at least minOnMs and is quiet now. turn it down
+
+      // reduce the brightness at 2x the rate we reduce max level
+      // we were using "video" scaling to fade (meaning: never fading to full black), but CHSV doesn't have a fadeLightBy method
+      // frequencyColors[i].fadeLightBy(int((1.0 - decayMax) * 4.0 * 255));
+      // TODO: should the brightness be tied to the currentLevel somehow? that might make it too random looking but now that we have better height calculations, maybe it should
+      frequencyColors[i].value *= decayMax;
+      frequencyColors[i].value *= decayMax;
     }
   }
 
@@ -754,10 +727,13 @@ void loop() {
 
     // using FastLED's delay allows for dithering by calling FastLED.show multiple times
     // showing can take a noticable time (especially with a reduced bandwidth) that we subtract from our delay
+    // so unless we can fit at least 2 draws in, just do regular show
     long draw_delay = ms_per_frame - loop_duration - draw_ms;
-    if (draw_delay > long(draw_ms)) {
+    if (draw_delay >= long(draw_ms * 2)) {
       // Serial.print("Delaying for ");
-      // Serial.println(draw_delay + draw_ms);
+      // Serial.print(draw_delay);
+      // Serial.print(" + ");
+      // Serial.println(draw_ms);
 
       unsigned long actual_delay = millis();
 
