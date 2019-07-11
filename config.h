@@ -13,24 +13,24 @@
 // TODO: MATRIX_CS_PIN if we plan on actually using the SD card
 // with pins 0/1 and 1500kHz data rate, this drew a single frame in 8ms
 // with pins 14/7 and 4000kHz data rate, this drew a single frame in 2ms (TODO: double check this)
-// #define MATRIX_CLOCK_PIN SPI_SCK_PIN  // yellow wire on my dotstars
-// #define MATRIX_DATA_PIN SPI_MOSI_PIN  // green wire on my dotstars
-// #define LED_CHIPSET APA102
-// #define LED_MODE BGR
-// #define LED_DATA_RATE_KHZ 4000
-// const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
-// const uint8_t numLEDsX = 64;
-// const uint8_t numLEDsY = 8;
+#define MATRIX_CLOCK_PIN SPI_SCK_PIN  // yellow wire on my dotstars
+#define MATRIX_DATA_PIN SPI_MOSI_PIN  // green wire on my dotstars
+#define LED_CHIPSET APA102
+#define LED_MODE BGR
+#define LED_DATA_RATE_KHZ 4000
+const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
+const uint8_t numLEDsX = 64;
+const uint8_t numLEDsY = 8;
 
 // neopixel matrix
 // TODO: make sure FASTLED_ALLOW_INTERRUPTS is 0 when using neopixels
-#define MATRIX_DATA_PIN SPI_MOSI_PIN
-#define LED_CHIPSET NEOPIXEL
-const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
-// TODO: ms_per_frame this needs to be some multiple of draw_ms
-// TODO: instead of connecting data lines on neopixels, dupe the outputs
-const uint8_t numLEDsX = 32;
-const uint8_t numLEDsY = 8;
+// #define MATRIX_DATA_PIN SPI_MOSI_PIN
+// #define LED_CHIPSET NEOPIXEL
+// const float ms_per_frame = 11.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
+// // TODO: ms_per_frame this needs to be some multiple of draw_ms
+// // TODO: instead of connecting data lines on neopixels, dupe the outputs
+// const uint8_t numLEDsX = 32;
+// const uint8_t numLEDsY = 8;
 
 // TODO: use volume knob for setting brightness. a light sensor could maybe work
 // TODO: or maybe just have a button to toggle between day and night brightness
