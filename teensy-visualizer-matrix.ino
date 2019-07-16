@@ -397,6 +397,8 @@ void mapFrequenciesToVisualizerMatrix() {
   static uint8_t lowestIndexToLight = 1;
   static uint8_t lowestIndexToLightWhite = 4;
 
+  bool reversed_this_frame = false;
+
   // OPTION 1: cycle frames_per_shift every X seconds
   // TODO: every X seconds change the frames_per_shift
   // if (millis() >= next_change_frames_per_shift) {
@@ -479,9 +481,10 @@ void mapFrequenciesToVisualizerMatrix() {
             // TODO: this doesn't work as well with the bars being two wide. need configurable 
             if (r < 34) {
               EVERY_N_SECONDS(3) {
-                // TODO: instead of a hard rotate, cycle speeds. 
-                reverse_rotation = !reverse_rotation;
-                frames_since_last_shift = current_frames_per_shift;
+                // TODO: instead of a hard rotate, cycle speeds
+                reversed_this_frame = true;
+                reverse_rotation = !reverse_rotation; // TODO: enum instead of bool?
+                frames_since_last_shift = current_frames_per_shift + 99;
               }
             } else if (r < 67) {
               EVERY_N_SECONDS(3) {
@@ -523,10 +526,12 @@ void mapFrequenciesToVisualizerMatrix() {
     frames_since_last_shift = 0;
 
     // TODO: maybe stay still for a frame if reverse_rotation just changed?
-    if (reverse_rotation) {
-      shift--;
-    } else {
-      shift++;
+    if (!reversed_this_frame) {
+      if (reverse_rotation) {
+        shift--;
+      } else {
+        shift++;
+      }
     }
   }
 }
