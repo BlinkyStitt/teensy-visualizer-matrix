@@ -480,6 +480,7 @@ void mapFrequencyColorsToOutputs() {
 // TODO: args instead of globals
 void mapOutputsToSpreadOutputs() {
   // TODO: this seems really inefficient since a ton of spots will just be black. it makes the code simple though
+  // TODO: make it 2 wide bars instead of a gap. or maybe have a gap, too
   for (uint16_t i = 0; i < numSpreadOutputs; i += ledsPerSpreadOutput) {
     outputsStretched[i] = outputs[i / ledsPerSpreadOutput];
   }

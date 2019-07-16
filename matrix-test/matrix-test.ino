@@ -14,18 +14,14 @@
 #include <SerialFlash.h>
 #include <Wire.h>
 
-#define VOLUME_KNOB A2
-#define SDCARD_CS_PIN 10
 #define SPI_MOSI_PIN 7  // alt pin for use with audio board (which is using 11)
 #define RED_LED 13
 #define SPI_SCK_PIN 14  // alt pin for use with audio board (which is using 13)
 // TODO: pin to check battery level?
 
-// TODO: software spi is causing problems. switch to hardware pins (which we only have one of!)
+// software spi is slower to refresh which is casuing problems
 #define MATRIX_CLOCK_PIN SPI_MOSI_PIN  // yellow wire on my dotstars
 #define MATRIX_DATA_PIN SPI_SCK_PIN  // green wire on my dotstars
-// TODO: MATRIX_CS_PIN and hardware so that we can access the SD without making the lights go crazy
-
 #define LED_CHIPSET APA102
 #define LED_MODE BGR
 
@@ -44,15 +40,6 @@ const uint16_t numLEDsY = 8;
 // TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive
 // TODO: we might want negative for Y, but using uint16_t is breaking that
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
-
-void setupSD() {
-  // slave select pin for SPI
-  pinMode(SDCARD_CS_PIN, OUTPUT);
-
-  SPI.begin(); // should this be here?
-
-  // read values from the SD card using IniFile
-}
 
 void setupAudio() {
   // Audio requires memory to work. I haven't seen this go over 11
@@ -103,8 +90,6 @@ void setup() {
   // setup SPI for the Audio board (which has an SD card reader)
   SPI.setMOSI(SPI_MOSI_PIN);
   SPI.setSCK(SPI_SCK_PIN);
-
-  setupSD();
 
   // TODO: read SD card here to configure things
 
