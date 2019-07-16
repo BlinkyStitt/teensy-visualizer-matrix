@@ -558,8 +558,6 @@ void combineMatrixes() {
 }
 
 bool new_frame = false;
-bool new_sprite_frame = false;
-
 unsigned long loop_duration = 0;
 
 void loop() {
