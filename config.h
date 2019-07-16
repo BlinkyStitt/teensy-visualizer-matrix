@@ -43,15 +43,80 @@ const uint16_t minBin = 0;   // TODO: skip 0-43Hz by starting at 1? 0 is rather 
 // const uint16_t maxBin = 372; // skip over 16kHz
 const uint16_t maxBin = 418; // skip over 18kHz
 
-const uint8_t numOutputs = 16; // this needs to fit into a 64 wide matrix
-const uint8_t numFreqBands = numOutputs;  // this will grow/shrink to fit inside numOutput. TODO: what should this be? maybe just do 8
+// TODO: make this configurable while the program is running
+const uint8_t numFreqBands = 16;  // this needs to fit into a 64 wide matrix
 
-// TODO: make this dynamic. 1, 2, 4 all fit
-const uint8_t ledsPerSpreadOutput = 2;
-const uint8_t numSpreadOutputs = numOutputs * ledsPerSpreadOutput;
-// TODO: make sure numSpreadOutputs fits evenly inside numLEDsX
+// TODO: cycle between multiple patterns
+const uint8_t visualizerXtoFrequencyId[] = {
+   0,  // 0
+  99,  // 1
+   1, // 2 (>numFreqBands == OFF)
+  99, // 3
+   2,  // 4
+  99,  // 5
+   3, // 6
+  99, // 7
+   4,  // 8
+  99,  // 9
+   5, // 10
+  99, // 11
+   6,  // 12
+  99,  // 13
+   7, // 14
+  99, // 15
+   8,  // 16
+  99, // 17
+   9, // 18
+  99, // 19
+  10, // 20
+  99, // 21
+  11, // 22
+  99, // 23
+  12, // 24
+  99, // 25
+  13, // 26
+  99, // 27
+  14, // 28
+  99, // 29
+  15, // 30
+  99, // 31
+};
+// const uint8_t visualizerXtoFrequencyId[] = {
+//   0,  // 0
+//   0,  // 1
+//   99, // 2 (>numFreqBands == OFF)
+//   99, // 3
+//   1,  // 4
+//   1,  // 5
+//   99, // 6
+//   99, // 7
+//   2,  // 8
+//   2,  // 9
+//   99, // 10
+//   99, // 11
+//   3,  // 12
+//   3,  // 13
+//   99, // 14
+//   99, // 15
+//   4,  // 16
+//   4,  // 17
+//   99, // 18
+//   99, // 19
+//   5,  // 20
+//   5,  // 21
+//   99, // 22
+//   99, // 23
+//   6,  // 24
+//   6,  // 25
+//   99, // 26
+//   99, // 27
+//   7,  // 28
+//   7,  // 29
+//   99, // 30
+//   99, // 31
+// };
 
-const uint8_t visualizerNumLEDsX = numSpreadOutputs;
+const uint8_t visualizerNumLEDsX = 32;  // TODO: put this in a struct with frequencyToVisualizer?
 const uint8_t visualizerNumLEDsY = numLEDsY;
 // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 
@@ -67,7 +132,7 @@ const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 33
 float seconds_for_slow_rotation = 42;
 uint16_t frames_per_shift[] = {
   // maximum speed (no seizure speed)
-  uint16_t(1.5 * minOnMs / ms_per_frame + 0.5),
+  uint16_t(minOnMs / ms_per_frame + 0.5),
   // slow speed
   uint16_t(seconds_for_slow_rotation * 1000.0 / float(numLEDsX) / ms_per_frame + 0.5),
   // ludicrous speed

@@ -19,27 +19,17 @@
 uint16_t freqBands[numFreqBands];
 
 // keep track of the current levels. this is a sum of multiple frequency bins.
-// TODO: keep track of the average magnitude
 // keep track of the max volume for each frequency band (slowly decays)
 struct frequency {
   float current_magnitude;
-  // float average_magnitude;
   float max_magnitude;
+  uint8_t average_scaled_magnitude; // exponential moving average of current_magnitude divided by max_magnitude
+  unsigned long turnOnMs;  // keep track of when we turned a light on so they don't flicker when we change them
+  unsigned long turnOffMs;  // keep track of when we turned a light on so they don't flicker when we turn them off
 };
-frequency frequencies[numFreqBands] = {0, 0};
+frequency frequencies[numFreqBands] = {0, 0, 0, 0, 0};
 
-CHSV frequencyColors[numFreqBands];
-
-// frequencyColors are stretched/squished to fit this (squishing being what you probably want)
-// TODO: rename this to something more descriptive. or maybe get rid of it and store directly on the visualizer_matrix
-CHSV outputs[numOutputs];
-
-// outputs are stretched to fit this
-// TODO: rename this to something more descriptive. or maybe get rid of it and store directly on the visualizer_matrix
-CHSV outputsStretched[numSpreadOutputs];
-
-// TODO: not sure if HORIZONTAL_ZIGZAG_MATRIX is actually what we want. we will test when the LEDs arrive
-// TODO: we might want negative for Y, but using uint16_t is breaking that
+// TODO: move this to a seperate file so that we can support multiple led/el light combinations
 cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
 
 // because of how we fade the visualizer slowly, we need to have a seperate matrix for the sprites and text
@@ -56,10 +46,6 @@ AudioAnalyzeFFT1024 fft1024;
 AudioConnection patchCord1(i2s1, 0, i2s2, 0);
 AudioConnection patchCord2(i2s1, 0, fft1024, 0);
 AudioControlSGTL5000 audioShield; // xy=366,225
-
-// keep track of when to turn lights off so they don't flicker
-unsigned long turnOnMsArray[numFreqBands];
-unsigned long turnOffMsArray[numFreqBands];
 
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
 unsigned long draw_ms = 8;
@@ -164,17 +150,10 @@ void setupLights() {
   FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 5 * 1000);
   // FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
 
+  // TODO: check the volume knob to set this
   FastLED.setBrightness(DEFAULT_BRIGHTNESS); // TODO: read this from the SD card. or allow tuning with the volume knob
 
   // clear all the arrays
-  // TODO: init them empty instead
-  for (uint8_t i = 0; i < numOutputs; i++) {
-    outputs[i].value = 0;
-  }
-  for (uint8_t i = 0; i < numSpreadOutputs; i++) {
-    outputsStretched[i].value = 0;
-  }
-
   FastLED.clear(true);
 
   // show red, green, blue, so that we make sure LED_MODE is correct
@@ -302,88 +281,52 @@ float updateLevelsFromFFT() {
   return overall_max;
 }
 
-float getLocalMaxLevel(uint16_t i, float scale_neighbor, float overall_max, float scale_overall_max) {
-  float localMaxLevel = frequencies[i].max_magnitude;
-
-  // check previous level if we aren't the first level
-  if (i != 0) {
-    localMaxLevel = max(localMaxLevel, frequencies[i - 1].max_magnitude * scale_neighbor);
-  }
-
-  // check the next level if we aren't the last level
-  if (i != numFreqBands) {
-    localMaxLevel = max(localMaxLevel, frequencies[i + 1].max_magnitude * scale_neighbor);
-  }
-  
-  // check all the other bins, too
-  if (overall_max and scale_overall_max) {
-    localMaxLevel = max(localMaxLevel, overall_max * scale_overall_max);
-  }
-
-  return localMaxLevel;
-}
-
-void updateFrequencyColors() {
+void updateFrequencies() {
   // read FFT frequency data into a bunch of levels. assign each level a color and a brightness
   float overall_max = updateLevelsFromFFT();
 
+  // exponential moving average
+  float alpha = 0.98;
+  float alphaScale = 1.0;
+
   for (uint16_t i = 0; i < numFreqBands; i++) {
     // check if current magnitude is close to the max magnitude
-    // TODO: i thought i wanted "if (millis() >= turnOffMsArray[i] && frequencies[i].current_magnitude / local_max >= activate_difference) {"
+
+    // TODO: instead of scaling to an overall max. scale to some average of the overall and this frequency's max
+
     if (frequencies[i].current_magnitude >= overall_max * activate_difference) {
-      if (millis() < turnOnMsArray[i]) {
-        // nevermind! we need to wait longer to reduce flicker
+      if (millis() < frequencies[i].turnOnMs) {
+        // nevermind! we need to wait longer before changing this in order to reduce flicker
         continue;
       }
 
-      // https://github.com/FastLED/FastLED/wiki/FastLED-HSV-Colors#color-map-rainbow-vs-spectrum
-      // HSV makes it easy to cycle through the rainbow
-      // TODO: color-blind color pallete
-      // map(value, fromLow, fromHigh, toLow, toHigh)
-      // TODO: fastLED has a map8 function or something like that that i think is faster and meant for this
-      uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
+      float scaled_reading = frequencies[i].current_magnitude / overall_max * 255;
+      float lastOutput = frequencies[i].average_scaled_magnitude;
 
-      // use 255 as the max brightness. if that is too bright, FastLED.setBrightness can be changed in setup to reduce
-      // what 255 does
-      // uint8_t color_value = 
-      // TODO: -= fade_rate instead?
-      // use max to let it climb quickly but fall slowly
-      // TODO: we were doing  * decayMax here, but we do it elsewhere
-      // TODO: i think we should do an exponential moving average on this
-      // uint8_t color_value = max(color_value, frequencyColors[i].value);
+      uint8_t ema = (alpha * scaled_reading + (alphaScale - alpha) * lastOutput) / alphaScale;
 
-      uint8_t reading = frequencies[i].current_magnitude / overall_max * 255;
-
-      // exponential moving average
-      float alpha = 0.98;
-      float lastOutput = frequencyColors[i].value;
-      float alphaScale = 1.0;
-      uint8_t ema = (alpha * reading + (alphaScale - alpha) * lastOutput) / alphaScale;
-
-      // TODO: make sure this doesn't wrap
-      uint8_t lastOutputDecreased = frequencyColors[i].value * decayMax - fade_rate;
-
-      uint8_t color_value;
-      if (ema > lastOutputDecreased) {
-        // if the magnitude is increasing, or only a little less than the current value set it to the ema
-        color_value = ema;
+      uint8_t lastOutputDecreased = frequencies[i].average_scaled_magnitude * decayMax;
+      if (lastOutputDecreased < fade_rate) {
+        lastOutputDecreased = 0;
       } else {
-        // if the magnitude is decreasing, decrease at a fixed rate
-        color_value = lastOutputDecreased;
+        lastOutputDecreased -= fade_rate;
       }
 
-      // hue matches the frequency
-      // max saturation
-      // value matches the magnitude for the frequency
-      frequencyColors[i] = CHSV(color_hue, 255, color_value);
+      if (ema > lastOutputDecreased) {
+        // if the magnitude is increasing, or only a little less than the current value set it to the ema
+        frequencies[i].average_scaled_magnitude = ema;
+      } else {
+        // if the magnitude is decreasing, decrease at a fixed rate
+        frequencies[i].average_scaled_magnitude = lastOutputDecreased;
+      }
 
       // make sure we stay on for a minimum amount of time. this prevents flickering if the magnitude changes quickly
-      turnOnMsArray[i] = millis() + minOnMs / 2.1;
-      turnOffMsArray[i] = millis() + minOnMs;
+      frequencies[i].turnOnMs = millis() + minOnMs / 2.1;
+      frequencies[i].turnOffMs = millis() + minOnMs;
     } else {  // if (frequencies[i].current_magnitude < overall_max * activate_difference)
       // the current magnitude is not close to the max magnitude. turn it down if we have waited long enough
 
-      if (millis() < turnOffMsArray[i]) { 
+      if (millis() < frequencies[i].turnOffMs) { 
         // nevermind! we need to wait longer to reduce flicker
         continue;
       }
@@ -391,7 +334,7 @@ void updateFrequencyColors() {
       // TODO: i dont think this does exactly what we want here. we divide value by max. go back to using fade_factor?
       frequencies[i].max_magnitude *= decayMax;
 
-      if (frequencyColors[i].value == 0) {
+      if (frequencies[i].average_scaled_magnitude == 0) {
         // this light is already off
         continue;
       }
@@ -399,11 +342,9 @@ void updateFrequencyColors() {
       // the output has been on for at least minOnMs and is quiet now. turn it down
 
       // reduce the brightness at 2x the rate we reduce max level
-      // we were using "video" scaling to fade (meaning: never fading to full black), but CHSV doesn't have a fadeLightBy method
-      // frequencyColors[i].fadeLightBy(int((1.0 - decayMax) * 4.0 * 255));
-      // TODO: should the brightness be tied to the currentLevel somehow? that might make it too random looking but now that we have better height calculations, maybe it should
-      frequencyColors[i].value *= decayMax;
-      frequencyColors[i].value *= decayMax;
+      // TODO: maybe change this to be more directly tied to time to reach 0
+      frequencies[i].average_scaled_magnitude *= decayMax;
+      frequencies[i].average_scaled_magnitude *= decayMax;
     }
   }
 
@@ -412,14 +353,12 @@ void updateFrequencyColors() {
   for (uint16_t i = 0; i < numFreqBands; i++) {
     Serial.print("| ");
 
-    // TODO: maybe do something with parity here? i think i don't have enough lights for that to matter at this point.
+    // TODO: maybe do something with parity here? 
     // do some research
 
-    if (frequencyColors[i].value) {
+    if (frequencies[i].average_scaled_magnitude > 0) {
       // Serial.print(leds[i].getLuma() / 255.0);
-      // Serial.print(currentLevel[i]);
-      Serial.print(frequencyColors[i].value / 255.0, 2);
-      // Serial.print(frequencies[i].current_magnitude);
+      Serial.print(frequencies[i].average_scaled_magnitude / 255.0, 2);
     } else {
       Serial.print("    ");
     }
@@ -436,71 +375,14 @@ void updateFrequencyColors() {
 #endif
 }
 
-void mapFrequencyColorsToOutputs() {
-  for (uint16_t i = 0; i < numOutputs; i++) {
-    // numFreqBands can be bigger or smaller than numOutputs. a simple map like this works fine if numOutputs >
-    // numFreqBands, but if not it skips some
-    if (numOutputs == numFreqBands) {
-      outputs[i] = frequencyColors[i];
-    } else if (numOutputs > numFreqBands) {
-      // spread the frequency bands out; multiple LEDs for one frequency
-      outputs[i] = frequencyColors[map(i, 0, numOutputs, 0, numFreqBands)];
-    } else {
-      // shrink frequency bands down. pick the brightest color
-      // TODO: I don't think this is working
-
-      // start by setting it to the first available band.
-      uint16_t bottomFreqId = map(i, 0, numOutputs, 0, numFreqBands);
-
-      outputs[i] = frequencyColors[bottomFreqId];
-
-      uint16_t topFreqId = map(i + 1, 0, numOutputs, 0, numFreqBands);
-      for (uint16_t f = bottomFreqId + 1; f < topFreqId; f++) {
-        if (!frequencyColors[f].value) {
-          // TODO: dim it some to represent neighbor being off?
-          continue;
-        }
-
-        if (!outputs[i].value) {
-          // output is off, simply set the color as is
-          outputs[i] = frequencyColors[f];
-        } else {
-          // output has multiple frequencies to show
-          // TODO: don't just replace with the brighter. instead increase the brightness and shift the color or
-          // something to combine outputs[i] and frequencyColors[f]
-          if (outputs[i].value < frequencyColors[f].value) {
-            outputs[i] = frequencyColors[f];
-          }
-        }
-      }
-    }
-  }
-}
-
 // TODO: args instead of globals
-void mapOutputsToSpreadOutputs() {
-  // TODO: this seems really inefficient since a ton of spots will just be black. it makes the code simple though
-  // TODO: make it 2 wide bars instead of a gap. or maybe have a gap, too
-  for (uint16_t i = 0; i < numSpreadOutputs; i += ledsPerSpreadOutput) {
-    outputsStretched[i] = outputs[i / ledsPerSpreadOutput];
-  }
-}
-
-float map_float(float x, float in_min, float in_max, float out_min, float out_max) {
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
-// TODO: args instead of globals
-void mapSpreadOutputsToVisualizerMatrix() {
+void mapFrequenciesToVisualizerMatrix() {
   // shift increments each frame and is used to slowly modify the pattern
   // TODO: test this now that we are on a matrix
   // TODO: i don't like this shift method. it should fade the top pixel and work its way down, not dim the whole column evenly
   // TODO: the top pixels are flickering a lot, too. maybe we need minOnMs here instead of earlier?
   static uint16_t shift = 0;
   static uint16_t frames_since_last_shift = 0;
-
-  // TODO: should this be static?
-  static CHSV new_color;
 
   // cycle between different patterns
   static bool should_flip_y[visualizerNumLEDsX] = {false};
@@ -551,43 +433,24 @@ void mapSpreadOutputsToVisualizerMatrix() {
   }
 
   for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
-    // TODO: restructure this to change the rate of frames_per_shift.
     // we take the absolute value because shift might negative
     uint8_t shifted_x = abs((x + shift) % visualizerNumLEDsX);
 
+    // TODO: color palettes instead of simple rainbow hue
+    uint8_t visualizer_hue = map(x, 0, visualizerNumLEDsX - 1, 0, 255);
+
+    CHSV visualizer_color = CHSV(visualizer_hue, 255, value_visualizer);
+
+    uint8_t i = visualizerXtoFrequencyId[x];
+
     // draw a border
-    uint8_t i = x % numSpreadOutputs / ledsPerSpreadOutput;
-    // TODO: use fastLED function instead of map
-    uint8_t color_hue = map(i, 0, numFreqBands, 0, 255);
+    visualizer_matrix(shifted_x, 0) = visualizer_color;
+    visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_color;
 
-    CHSV border_color = CHSV(color_hue, 255, value_visualizer);
-
-    visualizer_matrix(shifted_x, 0) = border_color;
-    visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = border_color;
-
-    if (numSpreadOutputs == visualizerNumLEDsX) {
-      new_color = outputsStretched[x];
-    } else {
-      // numFreqBands can be bigger or smaller than numOutputs
-      // TODO: test this with large and small values of numSpreadOutputs vs numLEDs
-      if (numSpreadOutputs < visualizerNumLEDsX) {
-        // simple repeat of the pattern
-        new_color = outputsStretched[x % numSpreadOutputs];
-      } else {
-        // pattern is larger than numLEDs
-        new_color = outputsStretched[x % visualizerNumLEDsX];
-      }
-    }
-
-    if (new_color.value > 0) {
+    if (i < numFreqBands && frequencies[i].average_scaled_magnitude > 0) {
       // use the value to calculate the height for this color
-      // if value == 255, highestIndexToLight will be 8. This means the whole column will be max brightness
-      // TODO: should we do the frequences[...].average_magnitude / local_max calculations here?
-      uint8_t highestIndexToLight = map(new_color.value, 1, 255, lowestIndexToLight, visualizerNumLEDsY - 1);
-
-      // we are using height instead of brightness to represent how loud the frequency was
-      // so set to max brightness
-      new_color.value = value_visualizer;
+      // if value == 255, highestIndexToLight will be 7. This means the whole column will be max brightness
+      uint8_t highestIndexToLight = map(frequencies[i].average_scaled_magnitude, 1, 255, lowestIndexToLight, visualizerNumLEDsY - 1);
 
       for (uint8_t y = lowestIndexToLight; y <= visualizerNumLEDsY - 1; y++) {
         uint8_t shifted_y = y;
@@ -597,11 +460,11 @@ void mapSpreadOutputsToVisualizerMatrix() {
 
         if (y < highestIndexToLight) {
           // simple color bar
-          visualizer_matrix(shifted_x, shifted_y) = new_color;
+          visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
         } else if (y == highestIndexToLight) {
           if (y < lowestIndexToLightWhite) {
             // very short bars shouldn't have any white at the top
-            visualizer_matrix(shifted_x, shifted_y) = new_color;
+            visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
           } else {
             // taller bars should have white at the top
             visualizer_matrix(shifted_x, shifted_y) = CRGB::White;
@@ -611,19 +474,24 @@ void mapSpreadOutputsToVisualizerMatrix() {
             // loud_frame_counter++;
             // increment_loud_frame_counter = true;
 
-            if (random(100) < 50) {
+            uint8_t r = random(100);
+
+            // TODO: this doesn't work as well with the bars being two wide. need configurable 
+            if (r < 34) {
               EVERY_N_SECONDS(3) {
                 // TODO: instead of a hard rotate, cycle speeds. 
                 reverse_rotation = !reverse_rotation;
                 frames_since_last_shift = current_frames_per_shift;
               }
-            } else {
+            } else if (r < 67) {
               EVERY_N_SECONDS(3) {
                 // if we hit the top, light both ends white and flip this for the next time
                 visualizer_matrix(shifted_x, 0) = CRGB::White;
 
                 flip_y = should_flip_y[x] = !should_flip_y[x];
               }
+            } else {
+              // do nothing
             }
           }
         } else if (y < visualizerNumLEDsY - 1) {
@@ -634,8 +502,7 @@ void mapSpreadOutputsToVisualizerMatrix() {
         }
       }
     } else {
-      // it should be off
-
+      // the visualizer (but not the border!) should be off
       for (uint8_t y = lowestIndexToLight; y < numLEDsY - 1; y++) {
         // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
         visualizer_matrix(shifted_x, y) = CRGB::Black;
@@ -694,12 +561,10 @@ void loop() {
   loop_duration = millis();
 
   if (fft1024.available()) {
-    updateFrequencyColors();
+    updateFrequencies();
 
     // TODO: pass args to these functions instead of modifying globals
-    mapFrequencyColorsToOutputs();
-    mapOutputsToSpreadOutputs();
-    mapSpreadOutputsToVisualizerMatrix();
+    mapFrequenciesToVisualizerMatrix();
 
     new_frame = true;
   }
