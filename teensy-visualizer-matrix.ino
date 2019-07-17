@@ -9,6 +9,7 @@
 #include <LEDMatrix.h>
 #include <LEDSprites.h>
 #include <LEDText.h>
+#include <ResponsiveAnalogRead.h>
 #include <SD.h>
 #include <SPI.h>
 #include <SerialFlash.h>
@@ -47,8 +48,13 @@ AudioConnection patchCord1(i2s1, 0, i2s2, 0);
 AudioConnection patchCord2(i2s1, 0, fft1024, 0);
 AudioControlSGTL5000 audioShield; // xy=366,225
 
+// make a ResponsiveAnalogRead object, pass in the pin, and either true or false depending on if you want sleep enabled
+// enabling sleep will cause values to take less time to stop changing and potentially stop changing more abruptly,
+// where as disabling sleep will cause values to ease into their correct position smoothly and with slightly greater accuracy
+ResponsiveAnalogRead volume_knob(VOLUME_KNOB, false);
+
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
-unsigned long draw_ms = 8;
+unsigned long draw_ms = 4;
 unsigned long lastUpdate = 0;
 unsigned long lastDraw = 0;
 
@@ -123,6 +129,7 @@ void setupSD() {
 }
 
 void colorPattern(CRGB::HTMLColorCode color) {
+  // TODO: sin wave
   for (uint8_t x = 0; x < numLEDsX; x++) {
     uint8_t y = x % numLEDsY;
     leds(x, y) = color;
@@ -147,11 +154,11 @@ void setupLights() {
 
   // TODO: what should this be set to? the flexible panels are much larger
   // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
-  FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 5 * 1000);
+  // the on/off switch only does 2 amps
+  FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 2000);
   // FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
 
-  // TODO: check the volume knob to set this
-  FastLED.setBrightness(DEFAULT_BRIGHTNESS); // TODO: read this from the SD card. or allow tuning with the volume knob
+  setVisualizerBrightness();
 
   // clear all the arrays
   FastLED.clear(true);
@@ -367,6 +374,9 @@ void updateFrequencies() {
   Serial.print(AudioMemoryUsageMax());
   Serial.print(" blocks | ");
 
+  Serial.print(volume_knob.getValue());
+  Serial.print(" vol | ");
+
   // finish debug print
   Serial.print(millis() - lastUpdate);
   Serial.println("ms");
@@ -434,6 +444,10 @@ void mapFrequenciesToVisualizerMatrix() {
     new_pattern = false;
   }
 
+  // TODO: make this brighter (but don't overflow!)
+  CHSV visualizer_white = CHSV(0, 0, visualizer_white_value);
+  // visualizer_white.value *= 2;
+
   for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
     // we take the absolute value because shift might negative
     uint8_t shifted_x = abs((x + shift) % visualizerNumLEDsX);
@@ -441,7 +455,7 @@ void mapFrequenciesToVisualizerMatrix() {
     // TODO: color palettes instead of simple rainbow hue
     uint8_t visualizer_hue = map(x, 0, visualizerNumLEDsX - 1, 0, 255);
 
-    CHSV visualizer_color = CHSV(visualizer_hue, 255, value_visualizer);
+    CHSV visualizer_color = CHSV(visualizer_hue, 255, visualizer_color_value);
 
     uint8_t i = visualizerXtoFrequencyId[x];
 
@@ -469,7 +483,7 @@ void mapFrequenciesToVisualizerMatrix() {
             visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
           } else {
             // taller bars should have white at the top
-            visualizer_matrix(shifted_x, shifted_y) = CRGB::White;
+            visualizer_matrix(shifted_x, shifted_y) = visualizer_white;
           }
 
           if (highestIndexToLight >= visualizerNumLEDsY - 1) {
@@ -489,7 +503,7 @@ void mapFrequenciesToVisualizerMatrix() {
             } else if (r < 67) {
               EVERY_N_SECONDS(3) {
                 // if we hit the top, light both ends white and flip this for the next time
-                visualizer_matrix(shifted_x, 0) = CRGB::White;
+                visualizer_matrix(shifted_x, 0) = visualizer_white;
 
                 flip_y = should_flip_y[x] = !should_flip_y[x];
               }
@@ -536,6 +550,29 @@ void mapFrequenciesToVisualizerMatrix() {
   }
 }
 
+void setVisualizerBrightness() {
+  static bool first_run = true;
+
+  volume_knob.update();
+
+  if (volume_knob.hasChanged() || first_run) {
+    first_run = false;
+
+    int brightness = volume_knob.getValue();
+
+    DEBUG_PRINT("volume knob changed: ");
+    DEBUG_PRINTLN(brightness);
+
+    // TODO: we used to set 
+    brightness = map(brightness, 0, 1023, min_brightness, max_brightness);
+
+    DEBUG_PRINT("new brightness: ");
+    DEBUG_PRINTLN(brightness);
+
+    FastLED.setBrightness(brightness);
+  }
+}
+
 void combineMatrixes() {
   // TODO: what should we do here? how should we overlay/interleave the different matrixes into one?
 
@@ -563,6 +600,8 @@ unsigned long loop_duration = 0;
 void loop() {
   loop_duration = millis();
 
+  setVisualizerBrightness();
+
   if (fft1024.available()) {
     updateFrequencies();
 
@@ -589,31 +628,32 @@ void loop() {
     // showing can take a noticable time (especially with a reduced bandwidth) that we subtract from our delay
     // so unless we can fit at least 2 draws in, just do regular show
     long draw_delay = ms_per_frame - loop_duration - draw_ms;
+
+    unsigned long actual_delay = millis();
+
     if (draw_delay >= long(draw_ms * 2)) {
       // Serial.print("Delaying for ");
       // Serial.print(draw_delay);
       // Serial.print(" + ");
       // Serial.println(draw_ms);
 
-      unsigned long actual_delay = millis();
-
       FastLED.delay(draw_delay);
-
-      actual_delay = millis() - actual_delay;
-
-      // Serial.print("actual delay: ");
-      // Serial.println(actual_delay);
-
-      // TODO: does delaying like this to keep an even framerate make sense?
-      if (actual_delay < draw_delay + draw_ms) {
-        // Serial.println("framerate fix delay...");
-        delay(draw_delay + draw_ms - actual_delay);
-      }
     } else {
-      // Serial.print("Running too slow for delay! ");
-      // Serial.println(draw_delay);
-
+      DEBUG_PRINT("Running too slow for dithering! ");
+      DEBUG_PRINTLN(draw_ms * 2 - draw_delay);
       FastLED.show();
+    }
+
+    // TODO: we add 1 here just because if we are only 1 ms fast, we are fine
+    actual_delay = millis() - actual_delay + 1;
+    // Serial.print("actual delay: ");
+    // Serial.println(actual_delay);
+
+    // TODO: does delaying like this to keep an even framerate make sense?
+    if (actual_delay < draw_delay + draw_ms) {
+      // DEBUG_PRINT("delay to fix framerate: ");
+      // DEBUG_PRINTLN(draw_delay + draw_ms - actual_delay);
+      delay(draw_delay + draw_ms - actual_delay);
     }
   }
 }

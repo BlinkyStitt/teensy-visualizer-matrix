@@ -15,4 +15,4 @@ Instead of a single strip of LEDs, I'm running 2 64x8 LED matrixes.
 
 ## NOTES
 
-https://github.com/AaronLiddiment/LEDMatrix/wiki/1.Setting-Up
+<https://github.com/AaronLiddiment/LEDMatrix/wiki/1.Setting-Up>
