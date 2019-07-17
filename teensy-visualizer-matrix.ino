@@ -1,4 +1,4 @@
-#define DEBUG
+// #define DEBUG
 // #define DEBUG_SERIAL_WAIT
 #include "bs_debug.h"
 
@@ -149,7 +149,10 @@ void setupLights() {
   FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(LED_DATA_RATE_KHZ)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
 #else
   Serial.println("Setting up neopixels...");
-  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+  // drawing the neopixels takes 17ms.
+  int half_size = leds.Size() / 2;
+  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN_1>(leds[0], half_size).setCorrection(TypicalSMD5050);
+  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN_2>(leds[half_size], half_size).setCorrection(TypicalSMD5050);
 #endif
 
   // TODO: what should this be set to? the flexible panels are much larger
@@ -381,7 +384,8 @@ void updateFrequencies() {
   Serial.print(millis() - lastUpdate);
   Serial.println("ms");
   lastUpdate = millis();
-  Serial.flush();
+  // Serial.flush();
+
 #endif
 }
 
@@ -483,6 +487,7 @@ void mapFrequenciesToVisualizerMatrix() {
             visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
           } else {
             // taller bars should have white at the top
+            // TODO: but only if they are the same height or taller than they were on the previous frame. this way shrinking bars are topped by colors
             visualizer_matrix(shifted_x, shifted_y) = visualizer_white;
           }
 
@@ -643,7 +648,7 @@ void loop() {
 
       FastLED.delay(draw_delay);
     } else {
-      DEBUG_PRINT("Running too slow for dithering! ");
+      DEBUG_PRINT("Too slow for dithering! ");
       DEBUG_PRINTLN(draw_ms * 2 - draw_delay);
       FastLED.show();
     }
