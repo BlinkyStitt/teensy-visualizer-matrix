@@ -28,8 +28,7 @@
 #define MATRIX_DATA_PIN_1 SPI_MOSI_PIN
 #define MATRIX_DATA_PIN_2 SPI_SCK_PIN
 #define LED_CHIPSET NEOPIXEL
-
-// TODO: maybe this shouldn't be const and we should do (3 * draw_ms + 1)
+// TODO: maybe this shouldn't be const and we should do (3 * draw_ms + 1) if dither is enabled and draw_ms if it is disabled (min of 11.5 for audio)
 const float ms_per_frame = 1000.0 / 30.0;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
 
 // 52 the battery lasted 4.5 hours
@@ -52,23 +51,23 @@ const uint8_t numFreqBands = 16;  // this needs to fit into a 64 wide matrix
 
 // TODO: cycle between multiple patterns
 const uint8_t visualizerXtoFrequencyId[] = {
-   0,  // 0
-  99,  // 1
-   1, // 2 (>numFreqBands == OFF)
+   0, // 0
+  99, // 1 (>numFreqBands == OFF)
+   1, // 2
   99, // 3
-   2,  // 4
-  99,  // 5
+   2, // 4
+  99, // 5
    3, // 6
   99, // 7
-   4,  // 8
-  99,  // 9
+   4, // 8
+  99, // 9
    5, // 10
   99, // 11
-   6,  // 12
-  99,  // 13
+   6, // 12
+  99, // 13
    7, // 14
   99, // 15
-   8,  // 16
+   8, // 16
   99, // 17
    9, // 18
   99, // 19
