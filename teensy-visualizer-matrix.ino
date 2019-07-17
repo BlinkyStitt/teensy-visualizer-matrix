@@ -1,4 +1,4 @@
-// #define DEBUG
+#define DEBUG
 // #define DEBUG_SERIAL_WAIT
 #include "bs_debug.h"
 
@@ -151,8 +151,10 @@ void setupLights() {
   Serial.println("Setting up neopixels...");
   // drawing the neopixels takes 17ms.
   int half_size = leds.Size() / 2;
-  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN_1>(leds[0], half_size).setCorrection(TypicalSMD5050);
-  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN_2>(leds[half_size], half_size).setCorrection(TypicalSMD5050);
+  // FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN_1>(leds[0], half_size).setCorrection(TypicalSMD5050);
+  // FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN_2>(leds[half_size], half_size).setCorrection(TypicalSMD5050);
+
+  FastLED.addLeds<WS2811_PORTD, 2>(leds[0], half_size);
 #endif
 
   // TODO: what should this be set to? the flexible panels are much larger
@@ -556,28 +558,34 @@ void mapFrequenciesToVisualizerMatrix() {
 }
 
 void setVisualizerBrightness() {
-  static int last_brightness = 0;
+  static uint8_t last_brightness = 0;
+  static bool last_dither = true;
 
   volume_knob.update();
 
   if (volume_knob.hasChanged() || last_brightness == 0) {
-    int brightness = volume_knob.getValue();
-
-    DEBUG_PRINT("volume knob changed: ");
-    DEBUG_PRINTLN(brightness);
+    int knob_value = volume_knob.getValue();
 
     // TODO: we used to set 
-    brightness = map(brightness, 0, 1023, min_brightness, max_brightness);
+    uint8_t brightness = map(knob_value, 0, 1023, min_brightness, max_brightness);
 
     if (brightness != last_brightness) {
+      DEBUG_PRINT("volume knob changed: ");
+      DEBUG_PRINTLN(knob_value);
+
       DEBUG_PRINT("new brightness: ");
       DEBUG_PRINTLN(brightness);
 
       // TODO: only call this if we are actually changing
 
       FastLED.setBrightness(brightness);
-
       last_brightness = brightness;
+
+      bool dither = brightness >= 36;
+      if (dither != last_dither) {
+        FastLED.setDither(dither);
+        last_dither = dither;
+      }
     }
   }
 }

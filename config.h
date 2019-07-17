@@ -20,9 +20,7 @@
 // #define LED_DATA_RATE_KHZ 4000
 // // the draw_ms for 512 LEDs is ~4ms
 // // const float ms_per_frame = 11.5 + 2;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
-// const float ms_per_frame = 1000.0 / 60.0;  // 60 fps. while we can run it faster, that doesn't give us time for dithering which we want at low brightness
-// const uint8_t numLEDsX = 64;
-// const uint8_t numLEDsY = 8;
+// const float ms_per_frame = 1000.0 / 60.0;  // 60 fps. while we can run it faster, that doesn't give us time for dithering
 
 // neopixel matrix
 // TODO: make sure FASTLED_ALLOW_INTERRUPTS is 0 when using neopixels
@@ -30,9 +28,17 @@
 #define MATRIX_DATA_PIN_1 SPI_MOSI_PIN
 #define MATRIX_DATA_PIN_2 SPI_SCK_PIN
 #define LED_CHIPSET NEOPIXEL
-const float ms_per_frame = 23.5;  // 11.5 is as fast as the audio can go, but it takes 8ms to draw and we need multiple draws for dithering
-// TODO: ms_per_frame this needs to be some multiple of draw_ms
-// TODO: instead of connecting data lines on neopixels, dupe the outputs
+
+// TODO: maybe this shouldn't be const and we should do (3 * draw_ms + 1)
+const float ms_per_frame = 1000.0 / 30.0;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
+
+// 52 the battery lasted 4.5 hours
+// 32 the battery lasted 6 hours
+const uint8_t min_brightness = 22;
+const uint8_t max_brightness = 255;
+const uint8_t visualizer_color_value = 185;  // we want 14 (maybe 16) after the balance is done. 
+const uint8_t visualizer_white_value = 255;  // we want 22 after the balance is done
+
 const uint8_t numLEDsX = 64;
 const uint8_t numLEDsY = 8;
 
@@ -147,15 +153,3 @@ const float decayMax = 0.98;
 const uint8_t fade_rate = 64;
 // set a floor so that decayMax doesn't go too low
 const float minMaxLevel = 0.15 / activate_difference;
-
-// TODO: use volume knob for setting brightness. a light sensor could maybe work
-// TODO: or maybe just have a button to toggle between day and night brightness
-// 52 the battery lasted 4.5 hours
-// 32 the battery lasted 6 hours
-// #define MIN_BRIGHTNESS 8 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
-// #define MAX_BRIGHTNESS 255 // TODO: read from SD. was 52 for 5v leds on the hat. need higher for 3.5v, but lower for being denser
-const uint8_t min_brightness = 22;
-const uint8_t max_brightness = 255;
-
-uint8_t visualizer_color_value = 185;  // we want 14 (maybe 16) after the balance is done. 
-uint8_t visualizer_white_value = 255;  // we want 22 after the balance is done
