@@ -551,13 +551,11 @@ void mapFrequenciesToVisualizerMatrix() {
 }
 
 void setVisualizerBrightness() {
-  static bool first_run = true;
+  static int last_brightness = 0;
 
   volume_knob.update();
 
-  if (volume_knob.hasChanged() || first_run) {
-    first_run = false;
-
+  if (volume_knob.hasChanged() || last_brightness == 0) {
     int brightness = volume_knob.getValue();
 
     DEBUG_PRINT("volume knob changed: ");
@@ -566,10 +564,16 @@ void setVisualizerBrightness() {
     // TODO: we used to set 
     brightness = map(brightness, 0, 1023, min_brightness, max_brightness);
 
-    DEBUG_PRINT("new brightness: ");
-    DEBUG_PRINTLN(brightness);
+    if (brightness != last_brightness) {
+      DEBUG_PRINT("new brightness: ");
+      DEBUG_PRINTLN(brightness);
 
-    FastLED.setBrightness(brightness);
+      // TODO: only call this if we are actually changing
+
+      FastLED.setBrightness(brightness);
+
+      last_brightness = brightness;
+    }
   }
 }
 
