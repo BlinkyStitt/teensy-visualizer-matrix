@@ -54,9 +54,14 @@ AudioControlSGTL5000 audioShield; // xy=366,225
 ResponsiveAnalogRead volume_knob(VOLUME_KNOB, false);
 
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
-unsigned long draw_ms = 4;
-unsigned long lastUpdate = 0;
-unsigned long lastDraw = 0;
+unsigned long draw_micros = 0;
+unsigned long last_update_ms = 0;
+// unsigned long lastDraw = 0;
+
+// used to keep track of brightness and dithering
+uint8_t g_brightness = 0;
+bool g_dither = true;
+bool g_dither_works_with_framerate = false;
 
 float FindE(uint16_t bands, uint16_t minBin, uint16_t maxBin) {
   // https://forum.pjrc.com/threads/32677-Is-there-a-logarithmic-function-for-FFT-bin-selection-for-any-given-of-bands?p=133842&viewfull=1#post133842
@@ -179,16 +184,20 @@ void setupLights() {
   colorPattern(CRGB::Red);
 
   // time FastLED.show so we can delay the right amount in our main loop
-  draw_ms = millis();
+  draw_micros = micros();
   FastLED.show();
-  draw_ms = millis() - draw_ms;
+  draw_micros = micros() - draw_micros;
 
   Serial.print("Draw time for show: ");
-  Serial.print(draw_ms);
-  Serial.println("ms");
+  Serial.print(draw_micros);
+  Serial.println("us");
+
+  g_dither_works_with_framerate = draw_micros * 3.0 / 1000.0 < ms_per_frame;
+  Serial.print("Dither works with framerate? ");
+  Serial.println(g_dither_works_with_framerate);
 
   // now delay for more time to make sure that fastled can power this many lights and update with this bandwidth
-  FastLED.delay(1500 - draw_ms);
+  FastLED.delay(1500 - draw_micros / 1000);
 
   Serial.println("Showing green...");
   colorPattern(CRGB::Green);
@@ -385,9 +394,9 @@ void updateFrequencies() {
     Serial.print(" vol | ");
 
     // finish debug print
-    Serial.print(millis() - lastUpdate);
+    Serial.print(millis() - last_update_ms);
     Serial.println("ms");
-    lastUpdate = millis();
+    last_update_ms = millis();
     Serial.flush();
   #endif
 }
@@ -562,18 +571,15 @@ void mapFrequenciesToVisualizerMatrix() {
 }
 
 void setVisualizerBrightness() {
-  static uint8_t last_brightness = 0;
-  static bool last_dither = true;
-
   volume_knob.update();
 
-  if (volume_knob.hasChanged() || last_brightness == 0) {
+  if (volume_knob.hasChanged() || g_brightness == 0) {
     int knob_value = volume_knob.getValue();
 
     // TODO: we used to set 
     uint8_t brightness = map(knob_value, 0, 1023, min_brightness, max_brightness);
 
-    if (brightness != last_brightness) {
+    if (brightness != g_brightness) {
       DEBUG_PRINT("volume knob changed: ");
       DEBUG_PRINTLN(knob_value);
 
@@ -583,14 +589,12 @@ void setVisualizerBrightness() {
       // TODO: only call this if we are actually changing
 
       FastLED.setBrightness(brightness);
-      last_brightness = brightness;
+      g_brightness = brightness;
 
-      bool dither = brightness >= dither_cutoff;
-      if (dither != last_dither) {
-        // TODO: if dithering is off, we can run at a 3x faster framerate
-
+      bool dither = brightness >= dither_cutoff && g_dither_works_with_framerate;
+      if (dither != g_dither) {
         FastLED.setDither(dither);
-        last_dither = dither;
+        g_dither = dither;
       }
     }
   }
@@ -620,7 +624,7 @@ void loop() {
   static bool new_frame = false;
   static unsigned long loop_duration = 0;
 
-  loop_duration = millis();
+  loop_duration = micros();
 
   setVisualizerBrightness();
 
@@ -641,7 +645,7 @@ void loop() {
     combineMatrixes();
 
     // the time to draw the audio/text/sprite is variable
-    loop_duration = millis() - loop_duration;
+    loop_duration = micros() - loop_duration;
 
     // Serial.print("loop duration: ");
     // Serial.println(loop_duration);
@@ -649,33 +653,48 @@ void loop() {
     // using FastLED's delay allows for dithering by calling FastLED.show multiple times
     // showing can take a noticable time (especially with a reduced bandwidth) that we subtract from our delay
     // so unless we can fit at least 2 draws in, just do regular show
-    long draw_delay = ms_per_frame - loop_duration - draw_ms;
+    long draw_delay_micros = ms_per_frame * 1000.0 - loop_duration - draw_micros;
 
-    unsigned long actual_delay = millis();
+    unsigned long actual_delay_micros = micros();
 
-    if (draw_delay >= long(draw_ms * 2)) {
-      // Serial.print("Delaying for ");
-      // Serial.print(draw_delay);
-      // Serial.print(" + ");
-      // Serial.println(draw_ms);
+    // TODO: if dithering is off, we can run at a 3x faster framerate
+    if (g_dither) {
+      if (draw_delay_micros >= long(draw_micros * 2)) {
+        // Serial.print("Delaying for ");
+        // Serial.print(draw_delay);
+        // Serial.print(" + ");
+        // Serial.println(draw_ms);
 
-      FastLED.delay(draw_delay);
+        FastLED.delay(draw_delay_micros / 1000);
+      } else {
+        DEBUG_PRINT("frame rate too fast for dithering! ");
+        DEBUG_PRINTLN(draw_micros * 2 - draw_delay_micros);
+        FastLED.show();
+      }
     } else {
-      DEBUG_PRINT("Too slow for dithering! ");
-      DEBUG_PRINTLN(draw_ms * 2 - draw_delay);
+      // DEBUG_PRINTLN(too dim for dithering! ");
       FastLED.show();
     }
 
-    // TODO: we add 1 here just because if we are only 1 ms fast, we are fine
-    actual_delay = millis() - actual_delay + 1;
-    // Serial.print("actual delay: ");
-    // Serial.println(actual_delay);
+    actual_delay_micros = micros() - actual_delay_micros;
+    // Serial.print("actual delay microseconds: ");
+    // Serial.println(actual_delay_micros);
 
-    // TODO: does delaying like this to keep an even framerate make sense?
-    if (actual_delay < draw_delay + draw_ms) {
-      // DEBUG_PRINT("delay to fix framerate: ");
-      // DEBUG_PRINTLN(draw_delay + draw_ms - actual_delay);
-      delay(draw_delay + draw_ms - actual_delay);
+    // we might need to delay more to actually match our desired framerate
+    if (actual_delay_micros < draw_delay_micros + draw_micros) {
+      actual_delay_micros = draw_delay_micros + draw_micros - actual_delay_micros;
+    } else if (actual_delay_micros == draw_delay_micros + draw_micros) {
+      actual_delay_micros = 0;
+    } else {
+      DEBUG_PRINTLN("frame rate too slow!");
+      actual_delay_micros = 0;
+    }
+
+    // we skip delaying for 4 because being off by 4us is close enough
+    if (actual_delay_micros > 4) {
+      DEBUG_PRINT("delay microseconds to fix framerate: ");
+      DEBUG_PRINTLN(actual_delay_micros);
+      delayMicroseconds(actual_delay_micros);
     }
   }
 }
