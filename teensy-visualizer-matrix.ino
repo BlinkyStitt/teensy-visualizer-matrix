@@ -137,29 +137,34 @@ void colorPattern(CRGB::HTMLColorCode color) {
 }
 
 void setupLights() {
-  // TODO: turn off onboard LED
   // TODO: clock select pin for FastLED to OUTPUT like we do for the SDCARD?
 
-  // with software spi, for one panel, 2mhz worked. when a second panel was added, 2mhz crashed after a few seconds, but 1mhz is working on my test code. crashed after a second or so though 
-  // looks like 500 mhz can run 2 panels, but we are having power troubles now. more power might mean we can increase the rate
-  // with 5.0v over usb, i can only run at 1500kHz
-  // TODO: it was working well at 2000kHz until the battery ran down, then i lowered the rate and it worked. when i put a new battery in, it crashed though
-#ifdef LED_DATA_RATE_KHZ
-  Serial.println("Setting up dotstars...");
-  FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN, MATRIX_CLOCK_PIN, LED_MODE, DATA_RATE_KHZ(LED_DATA_RATE_KHZ)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
-#else
-  Serial.println("Setting up neopixels...");
-  // drawing the neopixels takes 17ms.
-  int half_size = leds.Size() / 2;
-  // FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN_1>(leds[0], half_size).setCorrection(TypicalSMD5050);
-  // FastLED.addLeds<LED_CHIPSET, MATRIX_DATA_PIN_2>(leds[half_size], half_size).setCorrection(TypicalSMD5050);
+  #if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
+    Serial.println("Setting up dotstar 64x8 matrix...");
+    // with pins 0/1 and 1500kHz data rate, this drew a single frame in ~8ms. faster rates crashed or flickered when the battery was low
+    // with pins 14/7 and 4000kHz data rate, this drew a single frame in ~4ms. faster rates caused flickerin
+    FastLED.addLeds<APA102, SPI_MOSI_PIN, SPI_SCK_PIN, BGR, DATA_RATE_KHZ(4000)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+  #elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
+    Serial.println("Setting up neopixel 2x 32x8 matrix...");
+    // neopixels have a fixed data rate of 800kHz
 
-  FastLED.addLeds<WS2811_PORTD, 2>(leds[0], half_size);
-#endif
+    // serial output takes ~17ms
+    // int half_size = leds.Size() / 2;
+    // FastLED.addLeds<NEOPIXEL, MATRIX_DATA_PIN_1>(leds[0], half_size).setCorrection(TypicalSMD5050);
+    // FastLED.addLeds<NEOPIXEL, MATRIX_DATA_PIN_2>(leds[half_size], half_size).setCorrection(TypicalSMD5050);
+
+    // parallel output takes ~9ms
+    // WS2811_PORTD: 2,14,7,8,6,20,21,5
+    // WS2811_PORTC: 15,22,23,9,10,13,11,12,28,27,29,30 (these last 4 are pads on the bottom of the teensy)
+    // WS2811_PORTDC: 2,14,7,8,6,20,21,5,15,22,23,9,10,13,11,12 - 16 way parallel
+    FastLED.addLeds<WS2811_PORTD, 2>(leds[0], leds.Size() / 2);
+  #else
+    #error "unsupported LIGHT_TYPE"
+  #endif
 
   // TODO: what should this be set to? the flexible panels are much larger
   // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
-  // the on/off switch only does 2 amps
+  // the on/off switch only does 2 amps (and 2 amps is really bright)
   FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 2000);
   // FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
 
@@ -168,8 +173,8 @@ void setupLights() {
   // clear all the arrays
   FastLED.clear(true);
 
-  // show red, green, blue, so that we make sure LED_MODE is correct
-
+  // show red, green, blue, so that we make sure the lights are configured correctly
+  
   Serial.println("Showing red...");
   colorPattern(CRGB::Red);
 
@@ -220,14 +225,15 @@ void setupAudio() {
 }
 
 void setupRandom() {
-  randomSeed(analogRead(3));
+  randomSeed(analogRead(FLOATING_PIN));
+  // TODO: use fastled's random function instead?
 
-#ifdef DEBUG
-  Serial.println(random(100));
-  Serial.println(random(100));
-  Serial.println(random(100));
-  Serial.println(random(100));
-#endif
+  #ifdef DEBUG
+    Serial.println(random(100));
+    Serial.println(random(100));
+    Serial.println(random(100));
+    Serial.println(random(100));
+  #endif
 }
 
 void setup() {
@@ -264,7 +270,7 @@ float updateLevelsFromFFT() {
   // is linear, so for the higher octaves, read
   // many FFT bins together.
 
-  float overall_max = 0;
+  float overall_max = minMaxLevel;
 
   for (uint16_t i = 0; i < numFreqBands; i++) {
     if (i < numFreqBands - 1) {
@@ -276,16 +282,12 @@ float updateLevelsFromFFT() {
 
     if (frequencies[i].current_magnitude > frequencies[i].max_magnitude) {
       frequencies[i].max_magnitude = frequencies[i].current_magnitude;
-    } else {
-      // frequencies[i].max_magnitude *= decayMax;
     }
 
-    // don't let the max ever go to zero otherwise so that it turns off when its quiet instead of activating at a whisper
     if (frequencies[i].max_magnitude < minMaxLevel) {
+      // don't let the max ever go to zero so that it turns off when its quiet instead of activating at a whisper
       frequencies[i].max_magnitude = minMaxLevel;
-    }
-
-    if (frequencies[i].max_magnitude > overall_max) {
+    } else if (frequencies[i].max_magnitude > overall_max) {
       overall_max = frequencies[i].max_magnitude;
     }
   }
@@ -361,34 +363,33 @@ void updateFrequencies() {
   }
 
   // debug print
-#ifdef DEBUG
-  for (uint16_t i = 0; i < numFreqBands; i++) {
-    Serial.print("| ");
+  #ifdef DEBUG
+    for (uint16_t i = 0; i < numFreqBands; i++) {
+      Serial.print("| ");
 
-    // TODO: maybe do something with parity here? 
-    // do some research
+      // TODO: maybe do something with parity here? 
+      // do some research
 
-    if (frequencies[i].average_scaled_magnitude > 0) {
-      // Serial.print(leds[i].getLuma() / 255.0);
-      Serial.print(frequencies[i].average_scaled_magnitude / 255.0, 2);
-    } else {
-      Serial.print("    ");
+      if (frequencies[i].average_scaled_magnitude > 0) {
+        // Serial.print(leds[i].getLuma() / 255.0);
+        Serial.print(frequencies[i].average_scaled_magnitude / 255.0, 2);
+      } else {
+        Serial.print("    ");
+      }
     }
-  }
-  Serial.print("| ");
-  Serial.print(AudioMemoryUsageMax());
-  Serial.print(" blocks | ");
+    Serial.print("| ");
+    Serial.print(AudioMemoryUsageMax());
+    Serial.print(" blocks | ");
 
-  Serial.print(volume_knob.getValue());
-  Serial.print(" vol | ");
+    Serial.print(volume_knob.getValue());
+    Serial.print(" vol | ");
 
-  // finish debug print
-  Serial.print(millis() - lastUpdate);
-  Serial.println("ms");
-  lastUpdate = millis();
-  // Serial.flush();
-
-#endif
+    // finish debug print
+    Serial.print(millis() - lastUpdate);
+    Serial.println("ms");
+    lastUpdate = millis();
+    Serial.flush();
+  #endif
 }
 
 // TODO: args instead of globals
@@ -410,10 +411,10 @@ void mapFrequenciesToVisualizerMatrix() {
   static uint8_t current_frames_per_shift = frames_per_shift[frames_per_shift_index];
   // static unsigned long next_change_frames_per_shift = 0;
 
-  static uint8_t lowestIndexToLight = 1;
+  static uint8_t lowestIndexToLight = 1;  // 0 is the border
   static uint8_t lowestIndexToLightWhite = 4;
 
-  bool reversed_this_frame = false;
+  static bool reversed_this_frame = false;
 
   // OPTION 1: cycle frames_per_shift every X seconds
   // TODO: every X seconds change the frames_per_shift
@@ -442,25 +443,26 @@ void mapFrequenciesToVisualizerMatrix() {
   // TODO: if we are going too fast for too long, slow down
 
   if (new_pattern) {
+    // TODO: more patterns. maybe one where it grows from the middle. or goes from the top and the bottom
+
+    // flip the bottom and the top
     for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
       map_visualizer_y[y] = 7 - y;
     }
-    // TODO: this is too simplistic. i want a pattern where it goes outward and inward
 
     new_pattern = false;
   }
 
-  // TODO: make this brighter (but don't overflow!)
   CHSV visualizer_white = CHSV(0, 0, visualizer_white_value);
-  // visualizer_white.value *= 2;
 
   for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
     // we take the absolute value because shift might negative
     uint8_t shifted_x = abs((x + shift) % visualizerNumLEDsX);
 
-    // TODO: color palettes instead of simple rainbow hue
     uint8_t visualizer_hue = map(x, 0, visualizerNumLEDsX - 1, 0, 255);
 
+    // TODO: color palettes instead of simple rainbow hue
+    // TODO: variable brightness? variable saturation?
     CHSV visualizer_color = CHSV(visualizer_hue, 255, visualizer_color_value);
 
     uint8_t i = visualizerXtoFrequencyId[x];
@@ -471,7 +473,6 @@ void mapFrequenciesToVisualizerMatrix() {
 
     if (i < numFreqBands && frequencies[i].average_scaled_magnitude > 0) {
       // use the value to calculate the height for this color
-      // if value == 255, highestIndexToLight will be 7. This means the whole column will be max brightness
       uint8_t highestIndexToLight = map(frequencies[i].average_scaled_magnitude, 1, 255, lowestIndexToLight, visualizerNumLEDsY - 1);
 
       for (uint8_t y = lowestIndexToLight; y <= visualizerNumLEDsY - 1; y++) {
@@ -529,6 +530,7 @@ void mapFrequenciesToVisualizerMatrix() {
       // the visualizer (but not the border!) should be off
       for (uint8_t y = lowestIndexToLight; y < numLEDsY - 1; y++) {
         // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
+        // TODO: fading looks bad since they all fade at even rate and we want the top light to turn off first
         visualizer_matrix(shifted_x, y) = CRGB::Black;
       }
 
@@ -546,8 +548,10 @@ void mapFrequenciesToVisualizerMatrix() {
   if (frames_since_last_shift >= current_frames_per_shift) {
     frames_since_last_shift = 0;
 
-    // TODO: maybe stay still for a frame if reverse_rotation just changed?
-    if (!reversed_this_frame) {
+    // stay still for a frame if reverse_rotation just changed
+    if (reversed_this_frame) {
+      reversed_this_frame = false;
+    } else {
       if (reverse_rotation) {
         shift--;
       } else {
@@ -581,8 +585,10 @@ void setVisualizerBrightness() {
       FastLED.setBrightness(brightness);
       last_brightness = brightness;
 
-      bool dither = brightness >= 36;
+      bool dither = brightness >= dither_cutoff;
       if (dither != last_dither) {
+        // TODO: if dithering is off, we can run at a 3x faster framerate
+
         FastLED.setDither(dither);
         last_dither = dither;
       }
@@ -599,7 +605,6 @@ void combineMatrixes() {
       // TODO: if text, display text
       // TODO: else if sprite, display sprite
       // TODO: else display visualizer (wrapping on the x axis)
-      // TODO: do more interesting things with y. maybe set the middle of the array as the "bottom" and grow out
       if (y < visualizerNumLEDsY) {
         uint16_t vis_x = x % visualizerNumLEDsX;
         uint16_t vis_y = y % visualizerNumLEDsY;
@@ -611,10 +616,10 @@ void combineMatrixes() {
   }
 }
 
-bool new_frame = false;
-unsigned long loop_duration = 0;
-
 void loop() {
+  static bool new_frame = false;
+  static unsigned long loop_duration = 0;
+
   loop_duration = millis();
 
   setVisualizerBrightness();

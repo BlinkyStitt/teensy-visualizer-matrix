@@ -2,38 +2,29 @@
 #include <Arduino.h>
 #endif
 
-#define VOLUME_KNOB A1
-#define SDCARD_CS_PIN 10
-#define SPI_MOSI_PIN 7  // alt pin for use with audio board
-#define RED_LED 13
-#define SPI_SCK_PIN 14  // alt pin for use with audio board
-// TODO: pin to check battery level?
+#include "config_no_touch.h"
 
-// APA102 matrix
-// TODO: MATRIX_CS_PIN if we plan on actually using the SD card
-// with pins 0/1 and 1500kHz data rate, this drew a single frame in 8ms
-// with pins 14/7 and 4000kHz data rate, this drew a single frame in 2ms (TODO: double check this)
-// #define MATRIX_CLOCK_PIN SPI_SCK_PIN  // yellow wire on my dotstars
-// #define MATRIX_DATA_PIN SPI_MOSI_PIN  // green wire on my dotstars
-// #define LED_CHIPSET APA102
-// #define LED_MODE BGR
-// #define LED_DATA_RATE_KHZ 4000
-// // the draw_ms for 512 LEDs is ~4ms
-// // const float ms_per_frame = 11.5 + 2;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
-// const float ms_per_frame = 1000.0 / 60.0;  // 60 fps. while we can run it faster, that doesn't give us time for dithering
+#define LIGHT_TYPE NEOPIXEL_MATRIX_2x_32x8
 
-// neopixel matrix
-// TODO: make sure FASTLED_ALLOW_INTERRUPTS is 0 when using neopixels
-// TODO: investigate parallel output
-#define MATRIX_DATA_PIN_1 SPI_MOSI_PIN
-#define MATRIX_DATA_PIN_2 SPI_SCK_PIN
-#define LED_CHIPSET NEOPIXEL
-// TODO: maybe this shouldn't be const and we should do (3 * draw_ms + 1) if dither is enabled and draw_ms if it is disabled (min of 11.5 for audio)
-const float ms_per_frame = 1000.0 / 30.0;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
+#if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
+  #pragma message "LIGHT_TYPE = dotstar matrix 2x 32x8"
+  // TODO: MATRIX_CS_PIN if we plan on actually using the SD card
+  // const float ms_per_frame = 11.5 + 2;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
+  const float ms_per_frame = 1000.0 / 60.0;  // 60 fps. while we can run it faster, that doesn't give us time for dithering
+#elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
+  #pragma message "LIGHT_TYPE = neopixel matrix 2x 32x8"
+  // neopixel matrix
+  // TODO: make sure FASTLED_ALLOW_INTERRUPTS is 0 when using neopixels
+  // TODO: investigate parallel output
+  // TODO: maybe this shouldn't be const and we should do (3 * draw_ms + 1) if dither is enabled and draw_ms if it is disabled (min of 11.5 for audio)
+  const float ms_per_frame = 1000.0 / 30.0;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
+#else
+  #error "unsupported LIGHT_TYPE"
+#endif
 
-// 52 the battery lasted 4.5 hours
-// 32 the battery lasted 6 hours
+// with an older pattern, 52 the battery lasted 4.5 hours. 32 the battery lasted 6 hours
 const uint8_t min_brightness = 22;
+const uint8_t dither_cutoff = 36; // below this brightness, dithering causes flickering
 const uint8_t max_brightness = 255;
 const uint8_t visualizer_color_value = 185;  // we want 14 (maybe 16) after the balance is done. 
 const uint8_t visualizer_white_value = 255;  // we want 22 after the balance is done
