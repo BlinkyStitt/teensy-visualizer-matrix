@@ -595,9 +595,8 @@ void setVisualizerBrightness() {
 
     if (brightness != g_brightness) {
       DEBUG_PRINT("volume knob changed: ");
-      DEBUG_PRINTLN(knob_value);
-
-      DEBUG_PRINT("new brightness: ");
+      DEBUG_PRINT(knob_value);
+      DEBUG_PRINT("; new brightness: ");
       DEBUG_PRINTLN(brightness);
 
       // TODO: only call this if we are actually changing

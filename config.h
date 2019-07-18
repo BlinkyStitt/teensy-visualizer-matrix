@@ -4,7 +4,7 @@
 
 #include "config_no_touch.h"
 
-#define LIGHT_TYPE NEOPIXEL_MATRIX_2x_32x8
+#define LIGHT_TYPE DOTSTAR_MATRIX_64x8
 
 #if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
   #pragma message "LIGHT_TYPE = dotstar matrix 2x 32x8"
@@ -13,7 +13,7 @@
   // const float ms_per_frame = 11.5 + 1.6 + 1.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go, but we need some more time with 4.3ms draw times
   // const float ms_per_frame = 11.5 + 0.25 + 1.35 + 1;  // was 11.5 with less LEDs and a higher bandwidth // added more because its slower to process when it is louder
   // const float ms_per_frame = 1000.0 / 60.0;  // 60 fps. while we can run it faster, that doesn't give us time for dithering
-  const float ms_per_frame = 13;  // a little slower so we have more time for dither
+  const float ms_per_frame = 11.485;  // a little slower so we have more time for dither
 #elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
   #pragma message "LIGHT_TYPE = neopixel matrix 2x 32x8"
   // TODO: maybe this shouldn't be const and we should do (3 * draw_ms + 1) if dither is enabled and draw_ms if it is disabled (min of 11.5 for audio)
