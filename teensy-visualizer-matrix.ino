@@ -104,7 +104,7 @@ void setupFFTBins() {
 
   if (e) {                           // If a value was returned continue
     Serial.printf("E = %4.4f\n", e); // Print calculated E value
-    Serial.printf("  i  low high\n");
+    Serial.printf("  i  low    Hz high    Hz\n");
     for (uint16_t b = 0; b < numFreqBands; b++) { // Test and print the bins from the calculated E
       n = pow(e, b);
       d = n + 0.5;
@@ -112,10 +112,14 @@ void setupFFTBins() {
       Serial.printf("%3d ", b);
 
       Serial.printf("%4d ", count); // Print low bin
+      Serial.printf("%5d ", count * FREQUENCY_RESOLUTION_HZ); // Print low bin Hz
+
       freqBands[b] = count;  // Save the low bin to a global
 
       count += d - 1;
-      Serial.printf("%4d\n", count); // Print high bin
+      Serial.printf("%4d ", count); // Print high bin
+
+      Serial.printf("%5d\n", (count + 1) * FREQUENCY_RESOLUTION_HZ); // Print high bin Hz
 
       count++;
     }
@@ -623,7 +627,9 @@ void combineMatrixes() {
 void loop() {
   static bool new_frame = false;
   static unsigned long loop_duration = 0;
+  static unsigned long last_loop_duration = 0;
 
+  // the time to draw the audio/text/sprite and check the volume knob is variable. track it to keep an even framerate
   loop_duration = micros();
 
   setVisualizerBrightness();
@@ -644,18 +650,24 @@ void loop() {
 
     combineMatrixes();
 
-    // the time to draw the audio/text/sprite is variable
     loop_duration = micros() - loop_duration;
 
     // Serial.print("loop duration: ");
     // Serial.println(loop_duration);
+
+    if (last_loop_duration && loop_duration > last_loop_duration * 10) {
+      // micros() probably overflowed while we were running. assume the last loop's duration. this should be close enough
+      loop_duration = last_loop_duration;
+    } else {
+      last_loop_duration = loop_duration;
+    }
 
     // using FastLED's delay allows for dithering by calling FastLED.show multiple times
     // showing can take a noticable time (especially with a reduced bandwidth) that we subtract from our delay
     // so unless we can fit at least 2 draws in, just do regular show
     long draw_delay_micros = ms_per_frame * 1000.0 - loop_duration - draw_micros;
 
-    unsigned long actual_delay_micros = micros();
+    unsigned long delay_micros_needed = micros();
 
     // TODO: if dithering is off, we can run at a 3x faster framerate
     if (g_dither) {
@@ -676,25 +688,26 @@ void loop() {
       FastLED.show();
     }
 
-    actual_delay_micros = micros() - actual_delay_micros;
+    delay_micros_needed = micros() - delay_micros_needed;
     // Serial.print("actual delay microseconds: ");
     // Serial.println(actual_delay_micros);
 
     // we might need to delay more to actually match our desired framerate
-    if (actual_delay_micros < draw_delay_micros + draw_micros) {
-      actual_delay_micros = draw_delay_micros + draw_micros - actual_delay_micros;
-    } else if (actual_delay_micros == draw_delay_micros + draw_micros) {
-      actual_delay_micros = 0;
+    if (delay_micros_needed < draw_delay_micros + draw_micros) {
+      delay_micros_needed = draw_delay_micros + draw_micros - delay_micros_needed;
+    } else if (delay_micros_needed == draw_delay_micros + draw_micros) {
+      delay_micros_needed = 0;
     } else {
       DEBUG_PRINTLN("frame rate too slow!");
-      actual_delay_micros = 0;
+      delay_micros_needed = 0;
     }
 
     // we skip delaying for 4 because being off by 4us is close enough
-    if (actual_delay_micros > 4) {
+    // 4us is the resolution of the timer
+    if (delay_micros_needed > 4) {
       DEBUG_PRINT("delay microseconds to fix framerate: ");
-      DEBUG_PRINTLN(actual_delay_micros);
-      delayMicroseconds(actual_delay_micros);
+      DEBUG_PRINTLN(delay_micros_needed);
+      delayMicroseconds(delay_micros_needed);
     }
   }
 }

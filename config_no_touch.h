@@ -18,3 +18,5 @@
 #define SPI_MOSI_PIN 7  // alt pin for use with audio board
 #define RED_LED 13
 #define SPI_SCK_PIN 14  // alt pin for use with audio board
+
+#define FREQUENCY_RESOLUTION_HZ 43
