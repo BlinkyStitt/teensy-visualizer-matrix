@@ -205,6 +205,9 @@ void setupLights() {
     Serial.print("Dither does NOT work with framerate! Need ");
     Serial.print(ms_per_frame_needed_for_dither - ms_per_frame);
     Serial.println(" more ms");
+
+    g_dither = false;
+    FastLED.setDither(g_dither);
   }
 
   // now delay for more time to make sure that fastled can power this many lights and update with this bandwidth
@@ -602,10 +605,12 @@ void setVisualizerBrightness() {
       FastLED.setBrightness(brightness);
       g_brightness = brightness;
 
-      bool dither = brightness >= dither_cutoff && g_dither_works_with_framerate;
-      if (dither != g_dither) {
-        FastLED.setDither(dither);
-        g_dither = dither;
+      if (g_dither_works_with_framerate) {
+        bool dither = (brightness >= dither_cutoff);
+        if (dither != g_dither) {
+          FastLED.setDither(dither);
+          g_dither = dither;
+        }
       }
     }
   }
