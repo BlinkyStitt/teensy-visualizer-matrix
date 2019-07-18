@@ -60,8 +60,8 @@ unsigned long last_update_micros = 0;
 
 uint8_t g_brightness = 0;
 bool g_dither = true;
-// in order for dithering to work, we need to be able to FastLED.draw an odd number of times (min 3) within a single frame
-bool g_dither_works_with_framerate = false;
+// in order for dithering to work, we need to be able to FastLED.draw multiple times within a single frame
+bool g_dither_works_with_framerate = true;
 
 float FindE(uint16_t bands, uint16_t minBin, uint16_t maxBin) {
   // https://forum.pjrc.com/threads/32677-Is-there-a-logarithmic-function-for-FFT-bin-selection-for-any-given-of-bands?p=133842&viewfull=1#post133842
@@ -196,9 +196,16 @@ void setupLights() {
   Serial.print(draw_micros);
   Serial.println("us");
 
-  g_dither_works_with_framerate = draw_micros * 3.0 / 1000.0 < ms_per_frame;
-  Serial.print("Dither works with framerate? ");
-  Serial.println(g_dither_works_with_framerate);
+  float ms_per_frame_needed_for_dither = draw_micros * dither_min_shows / 1000.0;
+
+  g_dither_works_with_framerate = (ms_per_frame_needed_for_dither <= ms_per_frame);
+  if (g_dither_works_with_framerate) {
+    Serial.println("Dither works with framerate.");
+  } else {
+    Serial.print("Dither does NOT work with framerate! Need ");
+    Serial.print(ms_per_frame_needed_for_dither - ms_per_frame);
+    Serial.println(" more ms");
+  }
 
   // now delay for more time to make sure that fastled can power this many lights and update with this bandwidth
   FastLED.delay(1500 - draw_micros / 1000);
@@ -657,30 +664,36 @@ void loop() {
 
     if (last_loop_duration && loop_duration > last_loop_duration * 10) {
       // micros() probably overflowed while we were running. assume the last loop's duration. this should be close enough
+      DEBUG_PRINTLN("OVERFLOW DETECTED!");
       loop_duration = last_loop_duration;
     } else {
       last_loop_duration = loop_duration;
     }
 
-    // using FastLED's delay allows for dithering by calling FastLED.show multiple times
-    // showing can take a noticable time (especially with a reduced bandwidth) that we subtract from our delay
-    // so unless we can fit at least 2 draws in, just do regular show
-    long draw_delay_micros = ms_per_frame * 1000.0 - loop_duration - draw_micros;
+    // we have this much time left to draw and still meet our goal frame rate
+    unsigned long draw_delay_micros = ms_per_frame * 1000.0 - loop_duration;
 
+    // using FastLED's delay allows for dithering by calling FastLED.show multiple times
+    // each show can take a noticable time (especially with a reduced bandwidth)
+    // so unless we can fit at least 2 draws inside one frame, just do regular show
+
+    // counter to keep the framerate even
     unsigned long delay_micros_needed = micros();
 
-    // TODO: if dithering is off, we can run at a 3x faster framerate
+    // TODO: if dithering is off, we can run at a faster framerate
     if (g_dither) {
-      if (draw_delay_micros >= long(draw_micros * 2)) {
+      if (draw_delay_micros >= draw_micros * dither_min_shows) {
         // Serial.print("Delaying for ");
         // Serial.print(draw_delay);
         // Serial.print(" + ");
         // Serial.println(draw_ms);
 
-        FastLED.delay(draw_delay_micros / 1000);
+        // TODO: sometimes, the loop draws one more frame than it should. subtract draw_micros to stop that from happening
+        // TODO: this feels incorrect. this means it sometimes won't dither when it should. i doubt anyone will notice the occasional 4ms framerate delay. move on for now
+        FastLED.delay((draw_delay_micros - draw_micros) / 1000);
       } else {
         DEBUG_PRINT("frame rate too fast for dithering! ");
-        DEBUG_PRINTLN(draw_micros * 2 - draw_delay_micros);
+        DEBUG_PRINTLN(draw_micros * dither_min_shows - draw_delay_micros);
         FastLED.show();
       }
     } else {
@@ -693,20 +706,21 @@ void loop() {
     // Serial.println(actual_delay_micros);
 
     // we might need to delay more to actually match our desired framerate
-    if (delay_micros_needed < draw_delay_micros + draw_micros) {
-      delay_micros_needed = draw_delay_micros + draw_micros - delay_micros_needed;
-    } else if (delay_micros_needed == draw_delay_micros + draw_micros) {
+    if (delay_micros_needed < draw_delay_micros) {
+      delay_micros_needed = draw_delay_micros - delay_micros_needed;
+    } else if (delay_micros_needed == draw_delay_micros) {
       delay_micros_needed = 0;
     } else {
-      DEBUG_PRINTLN("frame rate too slow!");
+      DEBUG_PRINT("frame rate too slow! ");
+      DEBUG_PRINTLN(delay_micros_needed - draw_delay_micros);
       delay_micros_needed = 0;
     }
 
     // we skip delaying for 4 because being off by 4us is close enough
     // 4us is the resolution of the timer
     if (delay_micros_needed > 4) {
-      DEBUG_PRINT("delay microseconds to fix framerate: ");
-      DEBUG_PRINTLN(delay_micros_needed);
+      // DEBUG_PRINT("delay microseconds to fix framerate: ");
+      // DEBUG_PRINTLN(delay_micros_needed);
       delayMicroseconds(delay_micros_needed);
     }
   }
