@@ -194,7 +194,7 @@ void setupLights() {
 
   Serial.print("Draw time for show: ");
   Serial.print(draw_micros);
-  Serial.println("us");
+  Serial.println(" us");
 
   float ms_per_frame_needed_for_dither = draw_micros * dither_min_shows / 1000.0;
 
@@ -409,7 +409,7 @@ void updateFrequencies() {
 
     // finish debug print
     Serial.print(micros() - last_update_micros);
-    Serial.println("us");
+    Serial.println(" us");
     last_update_micros = micros();
     Serial.flush();
   #endif
