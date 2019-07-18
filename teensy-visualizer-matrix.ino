@@ -55,12 +55,12 @@ ResponsiveAnalogRead volume_knob(VOLUME_KNOB, false);
 
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
 unsigned long draw_micros = 0;
-unsigned long last_update_ms = 0;
+unsigned long last_update_micros = 0;
 // unsigned long lastDraw = 0;
 
-// used to keep track of brightness and dithering
 uint8_t g_brightness = 0;
 bool g_dither = true;
+// in order for dithering to work, we need to be able to FastLED.draw an odd number of times (min 3) within a single frame
 bool g_dither_works_with_framerate = false;
 
 float FindE(uint16_t bands, uint16_t minBin, uint16_t maxBin) {
@@ -153,12 +153,12 @@ void setupLights() {
     Serial.println("Setting up neopixel 2x 32x8 matrix...");
     // neopixels have a fixed data rate of 800kHz
 
-    // serial output takes ~17ms
+    // serial output takes ~16.8ms
     // int half_size = leds.Size() / 2;
     // FastLED.addLeds<NEOPIXEL, MATRIX_DATA_PIN_1>(leds[0], half_size).setCorrection(TypicalSMD5050);
     // FastLED.addLeds<NEOPIXEL, MATRIX_DATA_PIN_2>(leds[half_size], half_size).setCorrection(TypicalSMD5050);
 
-    // parallel output takes ~9ms
+    // parallel output takes ~8.4ms
     // WS2811_PORTD: 2,14,7,8,6,20,21,5
     // WS2811_PORTC: 15,22,23,9,10,13,11,12,28,27,29,30 (these last 4 are pads on the bottom of the teensy)
     // WS2811_PORTDC: 2,14,7,8,6,20,21,5,15,22,23,9,10,13,11,12 - 16 way parallel
@@ -394,9 +394,9 @@ void updateFrequencies() {
     Serial.print(" vol | ");
 
     // finish debug print
-    Serial.print(millis() - last_update_ms);
-    Serial.println("ms");
-    last_update_ms = millis();
+    Serial.print(micros() - last_update_micros);
+    Serial.println("us");
+    last_update_micros = micros();
     Serial.flush();
   #endif
 }

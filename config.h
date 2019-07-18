@@ -16,7 +16,7 @@
   // TODO: maybe this shouldn't be const and we should do (3 * draw_ms + 1) if dither is enabled and draw_ms if it is disabled (min of 11.5 for audio)
   // const float ms_per_frame = 1000.0 / 60.0;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
   // const float ms_per_frame = 30;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
-  const float ms_per_frame = 11.5;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
+  const float ms_per_frame = 11.425;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
 #else
   #error "unsupported LIGHT_TYPE"
 #endif
