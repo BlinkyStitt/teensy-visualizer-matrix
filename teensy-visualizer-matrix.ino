@@ -605,7 +605,7 @@ void setVisualizerBrightness() {
       g_brightness = brightness;
 
       if (g_dither_works_with_framerate) {
-        bool dither = (brightness >= dither_cutoff);
+        bool dither = (brightness >= dither_brightness_cutoff);
         if (dither != g_dither) {
           FastLED.setDither(dither);
           g_dither = dither;

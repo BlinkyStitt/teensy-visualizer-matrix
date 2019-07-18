@@ -29,19 +29,18 @@
 
 // with an older pattern, 52 the battery lasted 4.5 hours. 32 the battery lasted 6 hours
 const uint8_t min_brightness = 22;
-const uint8_t dither_cutoff = 36; // below this brightness, dithering causes flickering
-const uint8_t dither_min_shows = 2; // below this brightness, dithering causes flickering
+const uint8_t dither_brightness_cutoff = 36; // below this brightness, dithering causes flickering
+const uint8_t dither_min_shows = 2; // how many times draw needs to be called to make dithering worthwhile
 const uint8_t max_brightness = 255;
-const uint8_t visualizer_color_value = 185;  // we want 14 (maybe 16) after the balance is done. 
+const uint8_t visualizer_color_value = 185;  // we want 14 (maybe 16) after the balance is done
 const uint8_t visualizer_white_value = 255;  // we want 22 after the balance is done
 
 const uint8_t numLEDsX = 64;
 const uint8_t numLEDsY = 8;
 
-// each frequencyBin = ~43Hz
-const uint16_t minBin = 0;   // TODO: skip 0-43Hz by starting at 1? 0 is rather noisy
-// const uint16_t maxBin = 372; // skip over 16kHz
-const uint16_t maxBin = 418; // skip over 18kHz
+// each bin is FREQUENCY_RESOLUTION_HZ (43 Hz with teensy audio shield)
+const uint16_t minBin = 0;
+const uint16_t maxBin = 18000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18kHz
 
 // TODO: make this configurable while the program is running
 const uint8_t numFreqBands = 16;  // this needs to fit into a 64 wide matrix
