@@ -439,6 +439,7 @@ void mapFrequenciesToVisualizerMatrix() {
   static bool flip_y = false;
   static bool new_pattern = true;
 
+  static uint8_t last_frame_height[visualizerNumLEDsX] = {0};
   static uint8_t lowestIndexToLight = 1;  // 0 is the border
   static uint8_t lowestIndexToLightWhite = 4;
 
@@ -514,10 +515,21 @@ void mapFrequenciesToVisualizerMatrix() {
           if (y < lowestIndexToLightWhite) {
             // very short bars shouldn't have any white at the top
             visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
+
+            last_frame_height[x] = 0;
           } else {
             // taller bars should have white at the top
-            // TODO: but only if they are the same height or taller than they were on the previous frame. this way shrinking bars are topped by colors
-            visualizer_matrix(shifted_x, shifted_y) = visualizer_white;
+            // but only if they are the same height or taller than they were on the previous frame. this way shrinking bars are topped by colors
+            if (highestIndexToLight >= last_frame_height[x]) {
+              visualizer_matrix(shifted_x, shifted_y) = visualizer_white;
+
+              last_frame_height[x] = highestIndexToLight;
+            } else {
+              visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
+
+              // todo: this is probably wrong
+              last_frame_height[x] = highestIndexToLight + 1;
+            }
           }
 
           if (highestIndexToLight >= visualizerNumLEDsY - 1) {
