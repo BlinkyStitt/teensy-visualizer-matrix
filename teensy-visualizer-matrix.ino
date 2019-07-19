@@ -18,6 +18,15 @@
 
 #include "config.h"
 
+#if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
+  #pragma message "LIGHT_TYPE = dotstar matrix 2x 32x8"
+  // TODO: MATRIX_CS_PIN if we plan on actually using the SD card
+#elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
+  #pragma message "LIGHT_TYPE = neopixel matrix 2x 32x8"
+#else
+  #error "unsupported LIGHT_TYPE"
+#endif
+
 uint16_t freqBands[numFreqBands];
 
 // keep track of the current levels. this is a sum of multiple frequency bins.
@@ -209,6 +218,7 @@ void setupLights() {
   // TODO: calculate num_dither_shows based on brightness and visualizer_color_value
 
   // TODO: bring this back once we have ms_per_frame for sprite/text animations
+  // TODO: maybe have a "min_ms_per_frame" for checking dither until then? 2x256 parallel neopixels with dithering run loop in 23ms
   // float ms_per_frame_needed_for_dither = draw_micros * num_dither_shows / 1000.0;
   // g_dither_works_with_framerate = (ms_per_frame_needed_for_dither <= ms_per_frame);
   // if (g_dither_works_with_framerate) {
@@ -578,35 +588,7 @@ void mapFrequenciesToVisualizerMatrix() {
     }
   }
 
-  // debug print
-  #ifdef DEBUG
-    for (uint16_t i = 0; i < numFreqBands; i++) {
-      Serial.print("| ");
-
-      // TODO: maybe do something with parity here? 
-      // do some research
-
-      if (frequencies[i].average_scaled_magnitude > 0) {
-        // Serial.print(leds[i].getLuma() / 255.0);
-        Serial.print(frequencies[i].average_scaled_magnitude / 255.0, 2);
-      } else {
-        Serial.print("    ");
-      }
-    }
-    Serial.print("| ");
-    Serial.print(AudioMemoryUsageMax());
-    Serial.print(" blocks | ");
-
-    Serial.print(g_brightness);
-    Serial.print(" bright | ");
-
-    // finish debug print
-    Serial.print(micros() - last_update_micros);
-    Serial.println(" us");
-    last_update_micros = micros();
-    Serial.flush();
-  #endif
-
+  // TODO: debug timer
 }
 
 bool setVisualizerBrightnessFromTouch() {
@@ -747,7 +729,11 @@ void loop() {
     new_frame = true;
   }
 
-  // TODO: EVERY_N_MILLIS(...) { draw text/sprites and set new_frame=true }
+  EVERY_N_MILLIS(1000/60) {
+    // TODO: draw text/sprites
+
+    new_frame = true;
+  }
 
   if (new_frame) {
     combineMatrixes();
@@ -758,6 +744,35 @@ void loop() {
     } else {
       FastLED.show();
     }
+
+    // debug print
+    #ifdef DEBUG
+      for (uint16_t i = 0; i < numFreqBands; i++) {
+        Serial.print("| ");
+
+        // TODO: maybe do something with parity here? 
+        // do some research
+
+        if (frequencies[i].average_scaled_magnitude > 0) {
+          // Serial.print(leds[i].getLuma() / 255.0);
+          Serial.print(frequencies[i].average_scaled_magnitude / 255.0, 2);
+        } else {
+          Serial.print("    ");
+        }
+      }
+      Serial.print("| ");
+      Serial.print(AudioMemoryUsageMax());
+      Serial.print(" blocks | ");
+
+      Serial.print(g_brightness);
+      Serial.print(" bright | ");
+
+      // finish debug print
+      Serial.print(micros() - last_update_micros);
+      Serial.println(" us");
+      last_update_micros = micros();
+      Serial.flush();
+    #endif
 
     new_frame = false;
   }

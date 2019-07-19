@@ -4,6 +4,8 @@
 
 #include "hardware.h"
 
+#define LIGHT_TYPE DOTSTAR_MATRIX_64x8
+
 // with an older pattern, 52 the battery lasted 4.5 hours. 32 the battery lasted 6 hours
 // const uint8_t min_brightness = 22;
 const uint8_t min_brightness = 11;

@@ -13,17 +13,6 @@
 #define DOTSTAR_MATRIX_64x8 0
 #define NEOPIXEL_MATRIX_2x_32x8 1
 
-#define LIGHT_TYPE DOTSTAR_MATRIX_64x8
-
-#if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
-  #pragma message "LIGHT_TYPE = dotstar matrix 2x 32x8"
-  // TODO: MATRIX_CS_PIN if we plan on actually using the SD card
-#elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
-  #pragma message "LIGHT_TYPE = neopixel matrix 2x 32x8"
-#else
-  #error "unsupported LIGHT_TYPE"
-#endif
-
 // Teensy 3.2 w/ Audio board
 // TODO: document more pins. audio: 9, 11, 13, 18, 19, 22, 23. 
 #define FLOATING_PIN 3  // any floating pin. used to seed random
