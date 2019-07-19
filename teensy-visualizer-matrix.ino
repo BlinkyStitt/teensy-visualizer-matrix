@@ -157,6 +157,8 @@ void colorPattern(CRGB::HTMLColorCode color) {
 void setupLights() {
   // TODO: clock select pin for FastLED to OUTPUT like we do for the SDCARD?
 
+  // do NOT turn off the built-in LED. it is tied to the audio board!
+
   #if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
     Serial.println("Setting up dotstar 64x8 matrix...");
     // with pins 0/1 and 1500kHz data rate, this drew a single frame in ~8ms. faster rates crashed or flickered when the battery was low
@@ -189,15 +191,13 @@ void setupLights() {
   // we use the volume knob to set the default brightness
   setVisualizerBrightnessFromVolumeKnob();
 
-  // clear all the arrays
   FastLED.clear(true);
 
   // show red, green, blue, so that we make sure the lights are configured correctly
-  
   Serial.println("Showing red...");
   colorPattern(CRGB::Red);
 
-  // time FastLED.show so we can delay the right amount in our main loop
+  // time FastLED.show so we can calculate maximum frame rate
   draw_micros = micros();
   FastLED.show();
   draw_micros = micros() - draw_micros;
@@ -206,19 +206,20 @@ void setupLights() {
   Serial.print(draw_micros);
   Serial.println(" us");
 
-  float ms_per_frame_needed_for_dither = draw_micros * dither_min_shows / 1000.0;
+  // TODO: calculate num_dither_shows based on brightness and visualizer_color_value
 
-  g_dither_works_with_framerate = (ms_per_frame_needed_for_dither <= ms_per_frame);
-  if (g_dither_works_with_framerate) {
-    Serial.println("Dither works with framerate.");
-  } else {
-    Serial.print("Dither does NOT work with framerate! Need ");
-    Serial.print(ms_per_frame_needed_for_dither - ms_per_frame);
-    Serial.println(" more ms");
-
-    g_dither = false;
-    FastLED.setDither(g_dither);
-  }
+  // TODO: bring this back once we have ms_per_frame for sprite/text animations
+  // float ms_per_frame_needed_for_dither = draw_micros * num_dither_shows / 1000.0;
+  // g_dither_works_with_framerate = (ms_per_frame_needed_for_dither <= ms_per_frame);
+  // if (g_dither_works_with_framerate) {
+  //   Serial.println("Dither works with framerate.");
+  // } else {
+  //   Serial.print("Dither does NOT work with framerate! Need ");
+  //   Serial.print(ms_per_frame_needed_for_dither - ms_per_frame);
+  //   Serial.println(" more ms");
+  //   g_dither = false;
+  //   FastLED.setDither(g_dither);
+  // }
 
   // now delay for more time to make sure that fastled can power this many lights and update with this bandwidth
   FastLED.delay(1500 - draw_micros / 1000);
@@ -275,9 +276,10 @@ void setupTouch() {
   g_touch_available = cap.begin(MPR121_ADDRESS);
 
   if (g_touch_available) {
-    Serial.println("MPR121 found!");
+    Serial.println("MPR121 found.");
   } else {
-    Serial.println("MPR121 not found, check wiring?");
+    Serial.println("MPR121 not found!");
+    // TODO: print text on the LED matrix?
   }
 }
 
@@ -294,10 +296,10 @@ void setup() {
 
   setupSD();
 
-  setupTouch();
-
   // right now, once we setup the lights, we can't use the SD card anymore
   setupLights();
+
+  setupTouch();
 
   setupAudio();
 
@@ -408,60 +410,27 @@ void updateFrequencies() {
       frequencies[i].average_scaled_magnitude *= decayMax;
     }
   }
-
-  // debug print
-  #ifdef DEBUG
-    for (uint16_t i = 0; i < numFreqBands; i++) {
-      Serial.print("| ");
-
-      // TODO: maybe do something with parity here? 
-      // do some research
-
-      if (frequencies[i].average_scaled_magnitude > 0) {
-        // Serial.print(leds[i].getLuma() / 255.0);
-        Serial.print(frequencies[i].average_scaled_magnitude / 255.0, 2);
-      } else {
-        Serial.print("    ");
-      }
-    }
-    Serial.print("| ");
-    Serial.print(AudioMemoryUsageMax());
-    Serial.print(" blocks | ");
-
-    Serial.print(g_brightness);
-    Serial.print(" bright | ");
-
-    // finish debug print
-    Serial.print(micros() - last_update_micros);
-    Serial.println(" us");
-    last_update_micros = micros();
-    Serial.flush();
-  #endif
 }
 
 // TODO: args instead of globals
 void mapFrequenciesToVisualizerMatrix() {
-  // shift increments each frame and is used to slowly modify the pattern
-  // TODO: test this now that we are on a matrix
-  // TODO: i don't like this shift method. it should fade the top pixel and work its way down, not dim the whole column evenly
-  // TODO: the top pixels are flickering a lot, too. maybe we need minOnMs here instead of earlier?
+  // shift increments every current_ms_per_shift milliseconds and is used to slowly modify the pattern
   static uint16_t shift = 0;
-  static uint16_t frames_since_last_shift = 0;
+  static uint8_t ms_per_shift_index = 0;
+  static uint16_t current_ms_per_shift = ms_per_shift[ms_per_shift_index];
+  static unsigned long next_shift_at_ms = 0;
+  // cycle between shifting up and shifting down
+  static bool reverse_rotation = true;
+  // static unsigned long next_change_ms_per_shift = 0;
 
-  // cycle between different patterns
+  // cycle between lights coming from the top and the bottom
   static bool should_flip_y[visualizerNumLEDsX] = {false};
   static uint16_t map_visualizer_y[visualizerNumLEDsY] = {0};
   static bool flip_y = false;
   static bool new_pattern = true;
-  static bool reverse_rotation = true;
-  static uint8_t frames_per_shift_index = 0;
-  static uint8_t current_frames_per_shift = frames_per_shift[frames_per_shift_index];
-  // static unsigned long next_change_frames_per_shift = 0;
 
   static uint8_t lowestIndexToLight = 1;  // 0 is the border
   static uint8_t lowestIndexToLightWhite = 4;
-
-  static bool reversed_this_frame = false;
 
   // OPTION 1: cycle frames_per_shift every X seconds
   // TODO: every X seconds change the frames_per_shift
@@ -551,9 +520,8 @@ void mapFrequenciesToVisualizerMatrix() {
             if (r < 34) {
               EVERY_N_SECONDS(3) {
                 // TODO: instead of a hard rotate, cycle speeds
-                reversed_this_frame = true;
                 reverse_rotation = !reverse_rotation; // TODO: enum instead of bool?
-                frames_since_last_shift = current_frames_per_shift + 99;
+                next_shift_at_ms = millis() + current_ms_per_shift;
               }
             } else if (r < 67) {
               EVERY_N_SECONDS(3) {
@@ -591,28 +559,65 @@ void mapFrequenciesToVisualizerMatrix() {
   //   loud_frame_counter++;
   // }
 
-  frames_since_last_shift++;
-  if (frames_since_last_shift >= current_frames_per_shift) {
-    frames_since_last_shift = 0;
+  if (millis() >= next_shift_at_ms) {
+    // DEBUG_PRINT("SHIFTED! now: ");
+    // DEBUG_PRINT(millis());
+    // DEBUG_PRINT(" ms; goal: ");
+    // DEBUG_PRINT(next_shift_at_ms);
+    // DEBUG_PRINT(" ms; diff: ");
+    // DEBUG_PRINT(millis() - next_shift_at_ms);
+    // DEBUG_PRINT(" ms; next in: ");
+    // DEBUG_PRINTLN(current_ms_per_shift);
 
-    // stay still for a frame if reverse_rotation just changed
-    if (reversed_this_frame) {
-      reversed_this_frame = false;
+    next_shift_at_ms = millis() + current_ms_per_shift;
+
+    if (reverse_rotation) {
+      shift--;
     } else {
-      if (reverse_rotation) {
-        shift--;
-      } else {
-        shift++;
-      }
+      shift++;
     }
   }
+
+  // debug print
+  #ifdef DEBUG
+    for (uint16_t i = 0; i < numFreqBands; i++) {
+      Serial.print("| ");
+
+      // TODO: maybe do something with parity here? 
+      // do some research
+
+      if (frequencies[i].average_scaled_magnitude > 0) {
+        // Serial.print(leds[i].getLuma() / 255.0);
+        Serial.print(frequencies[i].average_scaled_magnitude / 255.0, 2);
+      } else {
+        Serial.print("    ");
+      }
+    }
+    Serial.print("| ");
+    Serial.print(AudioMemoryUsageMax());
+    Serial.print(" blocks | ");
+
+    Serial.print(g_brightness);
+    Serial.print(" bright | ");
+
+    // finish debug print
+    Serial.print(micros() - last_update_micros);
+    Serial.println(" us");
+    last_update_micros = micros();
+    Serial.flush();
+  #endif
+
 }
 
-void setVisualizerBrightnessFromTouch() {
+bool setVisualizerBrightnessFromTouch() {
+  bool brightness_changed = false;
+
   if (g_current_touch & _BV(brim_front)) {
     if (g_changed_touch & _BV(brim_left) && g_current_touch & _BV(brim_left)) {
       // hold the brim front and tap brim_left to increase brightness
       if (g_brightness < max_brightness) {
+        brightness_changed = true;
+
         g_brightness++;
 
         DEBUG_PRINT("Brightness increased to ");
@@ -625,6 +630,8 @@ void setVisualizerBrightnessFromTouch() {
     } else if (g_changed_touch & _BV(brim_back) && g_current_touch & _BV(brim_back)) {
       // hold the brim front and tap brim_back to decrease brightness
       if (g_brightness > min_brightness) {
+        brightness_changed = true;
+
         g_brightness--;
 
         DEBUG_PRINT("Brightness decreased to ");
@@ -638,10 +645,16 @@ void setVisualizerBrightnessFromTouch() {
       // TODO: if brim_front is held for 5 seconds without other touches, toggle flashlight mode
     }
   }
+
+  return brightness_changed;
 }
 
-void setVisualizerBrightnessFromVolumeKnob() {
-  volume_knob.update();
+bool setVisualizerBrightnessFromVolumeKnob() {
+  bool brightness_changed = false;
+
+  EVERY_N_MILLIS(100) {
+    volume_knob.update();
+  }
 
   if (volume_knob.hasChanged() || g_brightness == 0) {
     int knob_value = volume_knob.getValue();
@@ -650,6 +663,8 @@ void setVisualizerBrightnessFromVolumeKnob() {
     uint8_t brightness = map(knob_value, 0, 1023, min_brightness, max_brightness);
 
     if (brightness != g_brightness) {
+      brightness_changed = true;
+
       DEBUG_PRINT("volume knob changed: ");
       DEBUG_PRINT(knob_value);
       DEBUG_PRINT("; new brightness: ");
@@ -657,18 +672,22 @@ void setVisualizerBrightnessFromVolumeKnob() {
 
       // TODO: only call this if we are actually changing
 
-      FastLED.setBrightness(brightness);
       g_brightness = brightness;
+
+      FastLED.setBrightness(g_brightness);
 
       if (g_dither_works_with_framerate) {
         bool dither = (brightness >= dither_brightness_cutoff);
         if (dither != g_dither) {
-          FastLED.setDither(dither);
           g_dither = dither;
+
+          FastLED.setDither(g_dither);
         }
       }
     }
   }
+
+  return brightness_changed;
 }
 
 void combineMatrixes() {
@@ -678,7 +697,7 @@ void combineMatrixes() {
   for (uint16_t x = 0; x < numLEDsX; x++) {
     for (uint16_t y = 0; y < numLEDsY; y++) {
       // TODO: if text, display text
-      // TODO: else if sprite, display sprite
+      // TODO: else if sprite, display sprite (TODO: how are masks vs off going to be detected?)
       // TODO: else display visualizer (wrapping on the x axis)
       if (y < visualizerNumLEDsY) {
         uint16_t vis_x = x % visualizerNumLEDsX;
@@ -693,11 +712,6 @@ void combineMatrixes() {
 
 void loop() {
   static bool new_frame = false;
-  static unsigned long loop_duration = 0;
-  static unsigned long last_loop_duration = 0;
-
-  // the time to draw the audio/text/sprite and check the volume knob is variable. track it to keep an even framerate
-  loop_duration = micros();
 
   if (g_touch_available) {
     // if IRQ is low, there is new touch data to read
@@ -706,14 +720,22 @@ void loop() {
 
       g_changed_touch = g_current_touch ^ g_last_touch;
 
-      setVisualizerBrightnessFromTouch();
+      if (setVisualizerBrightnessFromTouch()) {
+        // we can wait for a next audio frame
+        // new_frame = true;
+      };
+
       // TODO: do more things based on touch
       // TODO: toggleFlashLightFromTouch();
 
       g_last_touch = g_current_touch;
     }
   } else {
-    setVisualizerBrightnessFromVolumeKnob();
+    if (setVisualizerBrightnessFromVolumeKnob()) {
+      // this floats a little and causes draws when we don't really care
+      // we can wait for a next audio frame
+      // new_frame = true;
+    }
   }
 
   if (fft1024.available()) {
@@ -728,77 +750,15 @@ void loop() {
   // TODO: EVERY_N_MILLIS(...) { draw text/sprites and set new_frame=true }
 
   if (new_frame) {
-    new_frame = false;
-
     combineMatrixes();
-
-    loop_duration = micros() - loop_duration;
-
-    // Serial.print("loop duration: ");
-    // Serial.println(loop_duration);
-
-    if (last_loop_duration && loop_duration > last_loop_duration * 10) {
-      // micros() probably overflowed while we were running. assume the last loop's duration. this should be close enough
-      DEBUG_PRINTLN("OVERFLOW DETECTED!");
-      loop_duration = last_loop_duration;
-    } else {
-      last_loop_duration = loop_duration;
-    }
-
-    // we have this much time left to draw and still meet our goal frame rate
-    unsigned long draw_delay_micros = ms_per_frame * 1000.0 - loop_duration;
-
-    // using FastLED's delay allows for dithering by calling FastLED.show multiple times
-    // each show can take a noticable time (especially with a reduced bandwidth)
-    // so unless we can fit at least 2 draws inside one frame, just do regular show
-
-    // counter to keep the framerate even
-    unsigned long delay_micros_needed = micros();
 
     // TODO: if dithering is off, we can run at a faster framerate
     if (g_dither) {
-      if (draw_delay_micros >= draw_micros * dither_min_shows) {
-        // Serial.print("Delaying for ");
-        // Serial.print(draw_delay);
-        // Serial.print(" + ");
-        // Serial.println(draw_ms);
-
-        // TODO: sometimes, the loop draws one more frame than it should. subtract draw_micros to stop that from happening
-        // TODO: this feels incorrect. this means it sometimes won't dither when it should. i doubt anyone will notice the occasional 4ms framerate delay. move on for now
-        FastLED.delay((draw_delay_micros - draw_micros) / 1000);
-      } else {
-        DEBUG_PRINT("frame rate too fast for dithering! ");
-        DEBUG_PRINTLN(draw_micros * dither_min_shows - draw_delay_micros);
-        FastLED.show();
-      }
+      FastLED.delay((draw_micros * num_dither_shows) / 1000);
     } else {
-      // DEBUG_PRINTLN(too dim for dithering! ");
       FastLED.show();
     }
 
-    delay_micros_needed = micros() - delay_micros_needed;
-    // Serial.print("actual delay microseconds: ");
-    // Serial.println(actual_delay_micros);
-
-    // we might need to delay more to actually match our desired framerate
-    if (delay_micros_needed < draw_delay_micros) {
-      delay_micros_needed = draw_delay_micros - delay_micros_needed;
-    } else if (delay_micros_needed == draw_delay_micros) {
-      delay_micros_needed = 0;
-    } else {
-      DEBUG_PRINT("frame rate too slow! ");
-      DEBUG_PRINTLN(delay_micros_needed - draw_delay_micros);
-      delay_micros_needed = 0;
-    }
-
-    // we skip delaying for 4 because being off by 4us is close enough
-    // 4us is the resolution of the timer
-    if (delay_micros_needed > 4) {
-      // DEBUG_PRINT("delay microseconds to fix framerate: ");
-      // DEBUG_PRINTLN(delay_micros_needed);
-
-      // TODO: if this is a big number, chunk it up and check sensors
-      delayMicroseconds(delay_micros_needed);
-    }
+    new_frame = false;
   }
 }

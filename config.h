@@ -4,34 +4,11 @@
 
 #include "hardware.h"
 
-#define LIGHT_TYPE DOTSTAR_MATRIX_64x8
-
-#if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
-  #pragma message "LIGHT_TYPE = dotstar matrix 2x 32x8"
-  // TODO: MATRIX_CS_PIN if we plan on actually using the SD card
-  // const float ms_per_frame = 11.5 + 2;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go
-  // const float ms_per_frame = 11.5 + 1.6 + 1.5;  // was 11.5 with less LEDs and a higher bandwidth // 11.5 is as fast as the audio can go, but we need some more time with 4.3ms draw times
-  // const float ms_per_frame = 11.5 + 0.25 + 1.35 + 1;  // was 11.5 with less LEDs and a higher bandwidth // added more because its slower to process when it is louder
-  // const float ms_per_frame = 1000.0 / 60.0;  // 60 fps. while we can run it faster, that doesn't give us time for dithering
-  const float ms_per_frame = 11.485;  // a little slower so we have more time for dither
-#elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
-  #pragma message "LIGHT_TYPE = neopixel matrix 2x 32x8"
-  // TODO: maybe this shouldn't be const and we should do (3 * draw_ms + 1) if dither is enabled and draw_ms if it is disabled (min of 11.5 for audio)
-  // const float ms_per_frame = 1000.0 / 60.0;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
-  // const float ms_per_frame = 30;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
-
-  // actually, dithering doens't look great when its this slow to draw. it adds a noticeable step to the shift. go back to high speed
-  const float ms_per_frame = 11.425;  // 11.5 is as fast as the audio can go, but it takes ~9ms to draw and we need multiple draws for dithering
-
-#else
-  #error "unsupported LIGHT_TYPE"
-#endif
-
 // with an older pattern, 52 the battery lasted 4.5 hours. 32 the battery lasted 6 hours
 // const uint8_t min_brightness = 22;
 const uint8_t min_brightness = 11;
 const uint8_t dither_brightness_cutoff = 36; // below this brightness, dithering causes flickering
-const uint8_t dither_min_shows = 2; // how many times draw needs to be called to make dithering worthwhile
+const uint8_t num_dither_shows = 2; // how many times draw needs to be called to make dithering worthwhile
 const uint8_t max_brightness = 255;
 const uint8_t visualizer_color_value = 185;
 const uint8_t visualizer_white_value = 255;
@@ -128,17 +105,16 @@ const uint8_t visualizerNumLEDsY = numLEDsY;
 const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 337?
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
-// slide the leds over 1 every X frames
-float seconds_for_slow_rotation = 42;
-uint16_t frames_per_shift[] = {
+// change the pattern every X milliseconds
+uint16_t ms_per_shift[] = {
   // maximum speed (no seizure speed)
-  uint16_t(minOnMs / ms_per_frame + 0.5),
+  minOnMs,
   // slow speed
-  uint16_t(seconds_for_slow_rotation * 1000.0 / float(numLEDsX) / ms_per_frame + 0.5),
+  uint16_t(42.0 * 1000.0 / float(numLEDsX) + 0.5),
   // ludicrous speed
-  3,
+  26,
   // full throttle
-  1,
+  0,
 };
 
 // how close a sound has to be to the loudest sound in order to activate
