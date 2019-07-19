@@ -28,12 +28,13 @@
 #endif
 
 // with an older pattern, 52 the battery lasted 4.5 hours. 32 the battery lasted 6 hours
-const uint8_t min_brightness = 22;
+// const uint8_t min_brightness = 22;
+const uint8_t min_brightness = 11;
 const uint8_t dither_brightness_cutoff = 36; // below this brightness, dithering causes flickering
 const uint8_t dither_min_shows = 2; // how many times draw needs to be called to make dithering worthwhile
 const uint8_t max_brightness = 255;
-const uint8_t visualizer_color_value = 185;  // we want 14 (maybe 16) after the balance is done
-const uint8_t visualizer_white_value = 255;  // we want 22 after the balance is done
+const uint8_t visualizer_color_value = 185;
+const uint8_t visualizer_white_value = 255;
 
 const uint8_t numLEDsX = 64;
 const uint8_t numLEDsY = 8;
