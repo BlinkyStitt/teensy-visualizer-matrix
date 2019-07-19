@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #endif
 
-#include "config_no_touch.h"
+#include "hardware.h"
 
 #define LIGHT_TYPE DOTSTAR_MATRIX_64x8
 

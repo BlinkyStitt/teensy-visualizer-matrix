@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 
+#include <Adafruit_MPR121.h>
 #include <Audio.h>
 #include <FastLED.h>
 #include <LEDMatrix.h>
@@ -52,6 +53,14 @@ AudioControlSGTL5000 audioShield; // xy=366,225
 // enabling sleep will cause values to take less time to stop changing and potentially stop changing more abruptly,
 // where as disabling sleep will cause values to ease into their correct position smoothly and with slightly greater accuracy
 ResponsiveAnalogRead volume_knob(VOLUME_KNOB, false);
+
+// up to 12 touches all detected from one breakout board
+// You can have up to 4 on one i2c bus
+Adafruit_MPR121 cap = Adafruit_MPR121();
+bool g_touch_available = false;
+uint16_t g_current_touch = 0;
+uint16_t g_last_touch = 0;
+uint16_t g_changed_touch = 0;
 
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
 unsigned long draw_micros = 0;
@@ -177,7 +186,8 @@ void setupLights() {
   FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 2000);
   // FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
 
-  setVisualizerBrightness();
+  // we use the volume knob to set the default brightness
+  setVisualizerBrightnessFromVolumeKnob();
 
   // clear all the arrays
   FastLED.clear(true);
@@ -259,6 +269,18 @@ void setupRandom() {
   #endif
 }
 
+void setupTouch() {
+  pinMode(MPR121_IRQ, INPUT);
+
+  g_touch_available = cap.begin(MPR121_ADDRESS);
+
+  if (g_touch_available) {
+    Serial.println("MPR121 found!");
+  } else {
+    Serial.println("MPR121 not found, check wiring?");
+  }
+}
+
 void setup() {
   debug_serial(115200, 2000);
 
@@ -268,9 +290,11 @@ void setup() {
   SPI.setMOSI(SPI_MOSI_PIN);
   SPI.setSCK(SPI_SCK_PIN);
 
-  SPI.begin(); // should this be here?
+  SPI.begin();
 
   setupSD();
+
+  setupTouch();
 
   // right now, once we setup the lights, we can't use the SD card anymore
   setupLights();
@@ -584,7 +608,37 @@ void mapFrequenciesToVisualizerMatrix() {
   }
 }
 
-void setVisualizerBrightness() {
+void setVisualizerBrightnessFromTouch() {
+  if (g_current_touch & _BV(brim_front)) {
+    if (g_changed_touch & _BV(brim_left) && g_current_touch & _BV(brim_left)) {
+      // hold the brim front and tap brim_left to increase brightness
+      if (g_brightness < max_brightness) {
+        g_brightness++;
+
+        DEBUG_PRINT("Brightness increased to ");
+        DEBUG_PRINTLN(g_brightness);
+
+        FastLED.setBrightness(g_brightness);
+      } else {
+        DEBUG_PRINTLN("Brightness @ max");
+      }
+    } else if (g_changed_touch & _BV(brim_back) && g_current_touch & _BV(brim_back)) {
+      // hold the brim front and tap brim_back to decrease brightness
+      if (g_brightness > min_brightness) {
+        g_brightness--;
+
+        DEBUG_PRINT("Brightness decreased to ");
+        DEBUG_PRINTLN(g_brightness);
+
+        FastLED.setBrightness(g_brightness);
+      } else {
+        DEBUG_PRINTLN("Brightness @ min");
+      }
+    }
+  }
+}
+
+void setVisualizerBrightnessFromVolumeKnob() {
   volume_knob.update();
 
   if (volume_knob.hasChanged() || g_brightness == 0) {
@@ -643,7 +697,21 @@ void loop() {
   // the time to draw the audio/text/sprite and check the volume knob is variable. track it to keep an even framerate
   loop_duration = micros();
 
-  setVisualizerBrightness();
+  if (g_touch_available) {
+    if (digitalRead(MPR121_IRQ) == LOW) {
+      g_current_touch = cap.touched();
+
+      g_changed_touch = g_current_touch ^ g_last_touch;
+
+      setVisualizerBrightnessFromTouch();
+
+      // TODO: do more things based on touch
+
+      g_last_touch = g_current_touch;
+    }
+  } else {
+    setVisualizerBrightnessFromVolumeKnob();
+  }
 
   if (fft1024.available()) {
     updateFrequencies();
