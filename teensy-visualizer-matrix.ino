@@ -428,8 +428,8 @@ void updateFrequencies() {
     Serial.print(AudioMemoryUsageMax());
     Serial.print(" blocks | ");
 
-    Serial.print(volume_knob.getValue());
-    Serial.print(" vol | ");
+    Serial.print(g_brightness);
+    Serial.print(" bright | ");
 
     // finish debug print
     Serial.print(micros() - last_update_micros);
@@ -634,6 +634,8 @@ void setVisualizerBrightnessFromTouch() {
       } else {
         DEBUG_PRINTLN("Brightness @ min");
       }
+    } else {
+      // TODO: if brim_front is held for 5 seconds without other touches, toggle flashlight mode
     }
   }
 }
@@ -698,14 +700,15 @@ void loop() {
   loop_duration = micros();
 
   if (g_touch_available) {
+    // if IRQ is low, there is new touch data to read
     if (digitalRead(MPR121_IRQ) == LOW) {
       g_current_touch = cap.touched();
 
       g_changed_touch = g_current_touch ^ g_last_touch;
 
       setVisualizerBrightnessFromTouch();
-
       // TODO: do more things based on touch
+      // TODO: toggleFlashLightFromTouch();
 
       g_last_touch = g_current_touch;
     }
@@ -793,6 +796,8 @@ void loop() {
     if (delay_micros_needed > 4) {
       // DEBUG_PRINT("delay microseconds to fix framerate: ");
       // DEBUG_PRINTLN(delay_micros_needed);
+
+      // TODO: if this is a big number, chunk it up and check sensors
       delayMicroseconds(delay_micros_needed);
     }
   }
