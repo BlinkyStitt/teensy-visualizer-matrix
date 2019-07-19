@@ -441,7 +441,7 @@ void mapFrequenciesToVisualizerMatrix() {
 
   static uint8_t last_frame_height[visualizerNumLEDsX] = {0};
   static uint8_t lowestIndexToLight = 1;  // 0 is the border
-  static uint8_t lowestIndexToLightWhite = 4;
+  static uint8_t lowestIndexToLightWhite = 3;
 
   // OPTION 1: cycle frames_per_shift every X seconds
   // TODO: every X seconds change the frames_per_shift
@@ -546,6 +546,7 @@ void mapFrequenciesToVisualizerMatrix() {
                 next_shift_at_ms = millis() + current_ms_per_shift;
               }
             } else if (r < 67) {
+              // TODO: maybe instead of EVERY_N_SECONDS, have a timer for each x?
               EVERY_N_SECONDS(3) {
                 // if we hit the top, light both ends white and flip this for the next time
                 visualizer_matrix(shifted_x, 0) = visualizer_white;
