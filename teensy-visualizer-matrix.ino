@@ -690,6 +690,8 @@ void combineMatrixes() {
       }
     }
   }
+
+  // TODO: return false if nothing changed? we can skip drawing then
 }
 
 void loop() {
@@ -731,7 +733,6 @@ void loop() {
 
   EVERY_N_MILLIS(1000/60) {
     // TODO: draw text/sprites
-
     new_frame = true;
   }
 
@@ -754,7 +755,6 @@ void loop() {
         // do some research
 
         if (frequencies[i].average_scaled_magnitude > 0) {
-          // Serial.print(leds[i].getLuma() / 255.0);
           Serial.print(frequencies[i].average_scaled_magnitude / 255.0, 2);
         } else {
           Serial.print("    ");
