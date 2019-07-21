@@ -127,3 +127,28 @@ const float decayMax = 0.98;
 const uint8_t fade_rate = 64;
 // set a floor so that decayMax doesn't go too low
 const float minMaxLevel = 0.15 / activate_difference;
+
+// https://github.com/AaronLiddiment/LEDText/wiki/4.Text-Array-&-Special-Character-Codes
+// TODO: do something with EFFECT_CUSTOM_RC
+const unsigned char text_woowoo[] = {
+  "           "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WoOoOoO!"
+  "  "
+  EFFECT_HSV "\x00\xff\xff" "W"
+  EFFECT_HSV "\x20\xff\xff" "o"
+  EFFECT_HSV "\x40\xff\xff" "O"
+  EFFECT_HSV "\x60\xff\xff" "o"
+  EFFECT_HSV "\xe0\xff\xff" "O"
+  EFFECT_HSV "\xc0\xff\xff" "o"
+  EFFECT_HSV "\xa0\xff\xff" "O"
+  EFFECT_HSV "\x80\xff\xff" "! "
+};
+
+// text runs at 25fps. so delaying 50 (0x32) frames = 2 seconds
+const unsigned char text_flashlight[] = {
+  "           "
+  EFFECT_RGB "\xff\xff\xff" "FLASHLIGHT"
+  EFFECT_DELAY_FRAMES "\x00\x32"
+  " "
+  EFFECT_CUSTOM_RC "\x01"
+};

@@ -7,6 +7,7 @@
 #include <Adafruit_MPR121.h>
 #include <Audio.h>
 #include <FastLED.h>
+#include <FontMatrise.h>
 #include <LEDMatrix.h>
 #include <LEDSprites.h>
 #include <LEDText.h>
@@ -43,10 +44,10 @@ frequency frequencies[numFreqBands] = {0, 0, 0, 0, 0};
 // TODO: move this to a seperate file so that we can support multiple led/el light combinations
 cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
 
-// because of how we fade the visualizer slowly, we need to have a seperate matrix for the sprites and text
-cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> sprite_matrix;
-cLEDSprites Sprites(&sprite_matrix);
+cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> text_matrix;
 cLEDText ScrollingMsg;
+
+// cLEDSprites Sprites(&sprite_matrix);
 
 // the sprites and visualizer get combined into this
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
@@ -71,12 +72,14 @@ uint16_t g_current_touch = 0;
 uint16_t g_last_touch = 0;
 uint16_t g_changed_touch = 0;
 
+bool g_flashlight_enabled = false;
+
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
 unsigned long draw_micros = 0;
 unsigned long last_update_micros = 0;
 // unsigned long lastDraw = 0;
 
-uint8_t g_brightness = 0;
+uint8_t g_brightness = 0, g_brightness_visualizer = 0, g_brightness_flashlight = 0;
 bool g_dither = true;
 // in order for dithering to work, we need to be able to FastLED.draw multiple times within a single frame
 bool g_dither_works_with_framerate = true;
@@ -198,7 +201,10 @@ void setupLights() {
   // FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
 
   // we use the volume knob to set the default brightness
-  setVisualizerBrightnessFromVolumeKnob();
+  setBrightnessFromVolumeKnob();
+
+  // TODO: default to brighter? (still max at 255 though)
+  g_brightness_flashlight = g_brightness;
 
   FastLED.clear(true);
 
@@ -293,6 +299,15 @@ void setupTouch() {
   }
 }
 
+void setupText() {
+  ScrollingMsg.SetFont(MatriseFontData);
+
+  ScrollingMsg.Init(&text_matrix, text_matrix.Width(), ScrollingMsg.FontHeight() + 1, 0, 0);
+
+  ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
+  ScrollingMsg.SetScrollDirection(SCROLL_LEFT);
+}
+
 void setup() {
   debug_serial(115200, 2000);
 
@@ -307,6 +322,7 @@ void setup() {
   setupSD();
 
   // right now, once we setup the lights, we can't use the SD card anymore
+  // TODO: add a CS pin for the lights
   setupLights();
 
   setupTouch();
@@ -314,6 +330,8 @@ void setup() {
   setupAudio();
 
   setupFFTBins();
+
+  setupText();
 
   setupRandom();
 
@@ -495,8 +513,13 @@ void mapFrequenciesToVisualizerMatrix() {
     uint8_t i = visualizerXtoFrequencyId[x];
 
     // draw a border
-    visualizer_matrix(shifted_x, 0) = visualizer_color;
-    visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_color;
+    if (g_flashlight_enabled) {
+      visualizer_matrix(shifted_x, 0) = visualizer_white;
+      visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_white;
+    } else {
+      visualizer_matrix(shifted_x, 0) = visualizer_color;
+      visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_color;
+    }
 
     if (i < numFreqBands && frequencies[i].average_scaled_magnitude > 0) {
       // use the value to calculate the height for this color
@@ -604,47 +627,53 @@ void mapFrequenciesToVisualizerMatrix() {
   // TODO: debug timer
 }
 
-bool setVisualizerBrightnessFromTouch() {
+bool setBrightnessFromTouch() {
   bool brightness_changed = false;
 
-  if (g_current_touch & _BV(brim_front)) {
-    if (g_changed_touch & _BV(brim_left) && g_current_touch & _BV(brim_left)) {
-      // hold the brim front and tap brim_left to increase brightness
-      if (g_brightness < max_brightness) {
-        brightness_changed = true;
+  if (g_changed_touch & _BV(brim_left) && g_current_touch & _BV(brim_left)) {
+    // hold the brim front and tap brim_left to increase brightness
+    if (g_brightness < max_brightness) {
+      brightness_changed = true;
 
-        g_brightness++;
+      g_brightness++;
 
-        DEBUG_PRINT("Brightness increased to ");
-        DEBUG_PRINTLN(g_brightness);
+      DEBUG_PRINT("Brightness increased to ");
+      DEBUG_PRINTLN(g_brightness);
 
-        FastLED.setBrightness(g_brightness);
-      } else {
-        DEBUG_PRINTLN("Brightness @ max");
-      }
-    } else if (g_changed_touch & _BV(brim_back) && g_current_touch & _BV(brim_back)) {
-      // hold the brim front and tap brim_back to decrease brightness
-      if (g_brightness > min_brightness) {
-        brightness_changed = true;
-
-        g_brightness--;
-
-        DEBUG_PRINT("Brightness decreased to ");
-        DEBUG_PRINTLN(g_brightness);
-
-        FastLED.setBrightness(g_brightness);
-      } else {
-        DEBUG_PRINTLN("Brightness @ min");
-      }
+      FastLED.setBrightness(g_brightness);
     } else {
-      // TODO: if brim_front is held for 5 seconds without other touches, toggle flashlight mode
+      DEBUG_PRINTLN("Brightness @ max");
+    }
+  } else if (g_changed_touch & _BV(brim_back) && g_current_touch & _BV(brim_back)) {
+    // hold the brim front and tap brim_back to decrease brightness
+    if (g_brightness > min_brightness) {
+      brightness_changed = true;
+
+      g_brightness--;
+
+      DEBUG_PRINT("Brightness decreased to ");
+      DEBUG_PRINTLN(g_brightness);
+
+      FastLED.setBrightness(g_brightness);
+    } else {
+      DEBUG_PRINTLN("Brightness @ min");
+    }
+  } else {
+    // TODO: if brim_front is held for 5 seconds without other touches, toggle flashlight mode
+  }
+
+  if (brightness_changed) {
+    if (g_flashlight_enabled) {
+      g_brightness_flashlight = g_brightness;
+    } else {
+      g_brightness_visualizer = g_brightness;
     }
   }
 
   return brightness_changed;
 }
 
-bool setVisualizerBrightnessFromVolumeKnob() {
+bool setBrightnessFromVolumeKnob() {
   bool brightness_changed = false;
 
   EVERY_N_MILLIS(100) {
@@ -667,6 +696,7 @@ bool setVisualizerBrightnessFromVolumeKnob() {
 
       // TODO: only call this if we are actually changing
 
+      // split brightness doesn't work with the knob
       g_brightness = brightness;
 
       FastLED.setBrightness(g_brightness);
@@ -691,15 +721,21 @@ void combineMatrixes() {
   // TODO: this could probably be a lot more efficient
   for (uint16_t x = 0; x < numLEDsX; x++) {
     for (uint16_t y = 0; y < numLEDsY; y++) {
-      // TODO: if text, display text
-      // TODO: else if sprite, display sprite (TODO: how are masks vs off going to be detected?)
-      // TODO: else display visualizer (wrapping on the x axis)
-      if (y < visualizerNumLEDsY) {
-        uint16_t vis_x = x % visualizerNumLEDsX;
-        uint16_t vis_y = y % visualizerNumLEDsY;
-        leds(x, y) = visualizer_matrix(vis_x, vis_y);
+      // if text/sprite, display it
+      // TODO: how are masks vs off going to be detected?
+      // TODO: do we need a margin? maybe if text is scrolling skip the visualizer 
+      // TODO: do we want the text to scroll at the same rate as the visualizer?
+      if (text_matrix(numLEDsX - x, y)) {
+        leds(x, y) = text_matrix(numLEDsX - x, y);
       } else {
-        leds(x, y) = CRGB::Black;
+        // TODO: else display visualizer (wrapping on the x axis)
+        if (y < visualizerNumLEDsY) {
+          uint16_t vis_x = x % visualizerNumLEDsX;
+
+          leds(x, y) = visualizer_matrix(vis_x, y);
+        } else {
+          leds(x, y) = CRGB::Black;
+        }
       }
     }
   }
@@ -707,8 +743,10 @@ void combineMatrixes() {
   // TODO: return false if nothing changed? we can skip drawing then
 }
 
+
 void loop() {
   static bool new_frame = false;
+  static bool text_complete = false;
 
   if (g_touch_available) {
     // if IRQ is low, there is new touch data to read
@@ -717,7 +755,7 @@ void loop() {
 
       g_changed_touch = g_current_touch ^ g_last_touch;
 
-      if (setVisualizerBrightnessFromTouch()) {
+      if (setBrightnessFromTouch()) {
         // we can wait for a next audio frame
         // new_frame = true;
       };
@@ -725,10 +763,14 @@ void loop() {
       // TODO: do more things based on touch
       // TODO: toggleFlashLightFromTouch();
 
+      if (text_complete) {
+        // TODO: button to trigger scrolling text
+      }
+
       g_last_touch = g_current_touch;
     }
   } else {
-    if (setVisualizerBrightnessFromVolumeKnob()) {
+    if (setBrightnessFromVolumeKnob()) {
       // this floats a little and causes draws when we don't really care
       // we can wait for a next audio frame
       // new_frame = true;
@@ -744,15 +786,52 @@ void loop() {
     new_frame = true;
   }
 
-  EVERY_N_MILLIS(1000/60) {
-    // TODO: draw text/sprites
-    new_frame = true;
+  if (!text_complete) {
+    EVERY_N_MILLIS(1000/25) {
+      // draw text
+
+      int scrolling_ret = ScrollingMsg.UpdateText();
+      // DEBUG_PRINT("Scrolling ret: ");
+      // DEBUG_PRINTLN(scrolling_ret);
+      if (scrolling_ret == -1) {
+        // when UpdateText returns -1, there is no more text to display
+        text_complete = true;
+      } else if (scrolling_ret == 1) {
+        // when UpdateText returns 1, the "FLASHLIGHT" text is done being displayed
+        // toggle flashlight mode
+        g_flashlight_enabled = !g_flashlight_enabled;
+
+        if (g_brightness_flashlight) {
+          g_brightness = g_brightness_flashlight;
+        } else if (g_brightness_visualizer) {
+          g_brightness = g_brightness_visualizer;
+        }
+      } else {
+        new_frame = true;
+      }
+    }
+  } else {
+    // TODO: draw sprites
+
+    // TODO: how often?
+    EVERY_N_SECONDS(10) {
+      // scroll text again
+      // TODO: cycle between different text
+      // TODO: instead of every_n_seconds, tie to touch sensor and to a bunch of visualizer columns hitting the top in a single frame
+      // TODO: put this back to text_woowoo
+      ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
+
+      ScrollingMsg.UpdateText();
+
+      text_complete = false;
+      new_frame = true;
+    }
   }
 
   if (new_frame) {
     combineMatrixes();
 
-    // TODO: if dithering is off, we can run at a faster framerate
+    // if dithering is off, we can run at a faster framerate
     if (g_dither) {
       FastLED.delay((draw_micros * num_dither_shows) / 1000);
     } else {
