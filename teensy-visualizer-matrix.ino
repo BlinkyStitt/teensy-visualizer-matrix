@@ -50,21 +50,44 @@ cLEDText ScrollingMsg;
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> sprite_matrix;
 cLEDSprites Sprites(&sprite_matrix);
 
+#define SHAPE_FRAMES   4
 #define SHAPE_WIDTH    6
 #define SHAPE_HEIGHT   6
 const uint8_t ShapeData[] = 
 {
+  // frame 0
   B8_1BIT(00110000),
   B8_1BIT(01001000),
   B8_1BIT(10000100),
+  B8_1BIT(10100100),
+  B8_1BIT(01001000),
+  B8_1BIT(00110000),
+  // frame 1
+  B8_1BIT(00110000),
+  B8_1BIT(01001000),
+  B8_1BIT(10100100),
   B8_1BIT(10000100),
+  B8_1BIT(01001000),
+  B8_1BIT(00110000),
+  // frame 2
+  B8_1BIT(00110000),
+  B8_1BIT(01001000),
+  B8_1BIT(10010100),
+  B8_1BIT(10000100),
+  B8_1BIT(01001000),
+  B8_1BIT(00110000),
+  // frame 3
+  B8_1BIT(00110000),
+  B8_1BIT(01001000),
+  B8_1BIT(10000100),
+  B8_1BIT(10010100),
   B8_1BIT(01001000),
   B8_1BIT(00110000),
 };
 struct CRGB ColorTable[1] = { CRGB(64, 128, 255) };
-cSprite Shape(SHAPE_WIDTH, SHAPE_HEIGHT, ShapeData, 1, _1BIT, ColorTable, ShapeData);
+cSprite Shape(SHAPE_WIDTH, SHAPE_HEIGHT, ShapeData, SHAPE_FRAMES, _1BIT, ColorTable, ShapeData);
 
-// the sprites and visualizer get combined into this
+// the text and sprites and visualizer get combined into this
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
 
 AudioInputI2S i2s1;  // xy=139,91
@@ -88,6 +111,7 @@ uint16_t g_last_touch = 0;
 uint16_t g_changed_touch = 0;
 
 bool g_flashlight_enabled = false;
+bool g_text_complete = false;
 
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
 unsigned long draw_micros = 0;
@@ -324,15 +348,16 @@ void setupText() {
 }
 
 void setupSprites() {
+  // sprites run at 60fps
   Shape.SetPositionFrameMotionOptions(
     0/*X*/, 
     0/*Y*/, 
     0/*Frame*/, 
-    0/*FrameRate*/, 
+    8/*FrameRate*/, 
     +1/*XChange*/, 
-    2/*XRate*/, 
+    8/*XRate*/, 
     +1/*YChange*/, 
-    8/*YRate*/, 
+    16/*YRate*/, 
     SPRITE_DETECT_EDGE | SPRITE_X_KEEPIN | SPRITE_Y_KEEPIN
   );
   Sprites.AddSprite(&Shape);
@@ -530,7 +555,7 @@ void mapFrequenciesToVisualizerMatrix() {
     new_pattern = false;
   }
 
-  CHSV visualizer_white = CHSV(0, 0, visualizer_white_value);
+  CRGB visualizer_white = CRGB(CHSV(0, 0, visualizer_white_value));
 
   for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
     // we take the absolute value because shift might negative
@@ -750,27 +775,34 @@ bool setBrightnessFromVolumeKnob() {
 void combineMatrixes() {
   // TODO: what should we do here? how should we overlay/interleave the different matrixes into one?
 
+  static CHSV visualizer_white = CHSV(0, 0, visualizer_white_value);
+  static CRGB black = CRGB::Black;
+
+  // update the value in case it changed
+  visualizer_white.value = visualizer_white_value;
+
   // TODO: this could probably be a lot more efficient
   for (uint16_t x = 0; x < numLEDsX; x++) {
-    for (uint16_t y = 0; y < numLEDsY; y++) {
-      // if text/sprite, display it
-      // TODO: how are masks vs off going to be detected?
-      // TODO: do we need a margin? maybe if text is scrolling skip the visualizer 
-      // TODO: do we want the text to scroll at the same rate as the visualizer?
-      // TODO: text_matrix OR sprite_matrix
-      if (text_matrix(numLEDsX - x, y)) {
-        leds(x, y) = text_matrix(numLEDsX - x, y);
-      } else if (sprite_matrix(numLEDsX - x, y)) {
-        leds(x, y) = sprite_matrix(numLEDsX - x, y);
-      } else {
-        // TODO: else display visualizer (wrapping on the x axis)
-        if (y < visualizerNumLEDsY) {
-          uint16_t vis_x = x % visualizerNumLEDsX;
+    uint16_t vis_x = x % visualizerNumLEDsX;
 
-          leds(x, y) = visualizer_matrix(vis_x, y);
-        } else {
-          leds(x, y) = CRGB::Black;
-        }
+    for (uint16_t y = 0; y < numLEDsY; y++) {
+      // if visualizer is white, display it
+      // else if text, display it
+      // else if sprite, display it
+      // else display the visualizer
+
+      // TODO: how are masks vs off going to be detected?
+      // TODO: text_matrix OR sprite_matrix
+      if (y < visualizerNumLEDsY && visualizer_matrix(vis_x, y) == visualizer_white) {
+        leds(x, y) = visualizer_white;
+      } else if (!g_text_complete && text_matrix(numLEDsX - x, y) != black) {
+        leds(x, y) = text_matrix(numLEDsX - x, y);
+      } else if (g_text_complete && sprite_matrix(numLEDsX - x, y) != black) {
+        leds(x, y) = sprite_matrix(numLEDsX - x, y);
+      } else if (y < visualizerNumLEDsY) {
+        leds(x, y) = visualizer_matrix(vis_x, y);
+      } else {
+        leds(x, y) = CRGB::Black;
       }
     }
   }
@@ -778,10 +810,8 @@ void combineMatrixes() {
   // TODO: return false if nothing changed? we can skip drawing then
 }
 
-
 void loop() {
   static bool new_frame = false;
-  static bool text_complete = false;
 
   if (g_touch_available) {
     // if IRQ is low, there is new touch data to read
@@ -798,9 +828,9 @@ void loop() {
       // TODO: do more things based on touch
       // TODO: toggleFlashLightFromTouch();
         // ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
-        // text_complete = false;
+        // g_text_complete = false;
 
-      if (text_complete) {
+      if (g_text_complete) {
         // TODO: check touch for button to trigger scrolling text
       }
 
@@ -823,7 +853,7 @@ void loop() {
     new_frame = true;
   }
 
-  if (!text_complete) {
+  if (!g_text_complete) {
     EVERY_N_MILLIS(1000/25) {
       // draw text
       int scrolling_ret = ScrollingMsg.UpdateText();
@@ -831,7 +861,7 @@ void loop() {
       // DEBUG_PRINTLN(scrolling_ret);
       if (scrolling_ret == -1) {
         // when UpdateText returns -1, there is no more text to display
-        text_complete = true;
+        g_text_complete = true;
       } else {
         // UpdateText drew a new frame
         new_frame = true;
@@ -862,23 +892,25 @@ void loop() {
 
       ScrollingMsg.UpdateText();
 
-      text_complete = false;
+      g_text_complete = false;
       new_frame = true;
     }
   }
 
-  // draw sprites
-  EVERY_N_MILLIS(1000/25) {
-    fill_solid(sprite_matrix[0], sprite_matrix.Size(), CRGB::Black);
+  // draw sprites if not drawing text
+  if (g_text_complete) {
+    EVERY_N_MILLIS(1000/60) {
+      fill_solid(sprite_matrix[0], sprite_matrix.Size(), CRGB::Black);
 
-    Sprites.UpdateSprites();
+      Sprites.UpdateSprites();
 
-    // TODO: do collision detection for pacman
-    //Sprites.DetectCollisions();
+      // TODO: do collision detection for pacman
+      //Sprites.DetectCollisions();
 
-    Sprites.RenderSprites();
+      Sprites.RenderSprites();
 
-    new_frame = true;
+      new_frame = true;
+    }
   }
 
   if (new_frame) {
