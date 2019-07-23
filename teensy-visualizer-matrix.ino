@@ -47,7 +47,22 @@ cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visua
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> text_matrix;
 cLEDText ScrollingMsg;
 
-// cLEDSprites Sprites(&sprite_matrix);
+cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> sprite_matrix;
+cLEDSprites Sprites(&sprite_matrix);
+
+#define SHAPE_WIDTH    6
+#define SHAPE_HEIGHT   6
+const uint8_t ShapeData[] = 
+{
+  B8_1BIT(00110000),
+  B8_1BIT(01001000),
+  B8_1BIT(10000100),
+  B8_1BIT(10000100),
+  B8_1BIT(01001000),
+  B8_1BIT(00110000),
+};
+struct CRGB ColorTable[1] = { CRGB(64, 128, 255) };
+cSprite Shape(SHAPE_WIDTH, SHAPE_HEIGHT, ShapeData, 1, _1BIT, ColorTable, ShapeData);
 
 // the sprites and visualizer get combined into this
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
@@ -304,8 +319,23 @@ void setupText() {
 
   ScrollingMsg.Init(&text_matrix, text_matrix.Width(), ScrollingMsg.FontHeight() + 1, 0, 0);
 
-  ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
+  ScrollingMsg.SetText((unsigned char *)text_woowoo, sizeof(text_woowoo) - 1);
   ScrollingMsg.SetScrollDirection(SCROLL_LEFT);
+}
+
+void setupSprites() {
+  Shape.SetPositionFrameMotionOptions(
+    0/*X*/, 
+    0/*Y*/, 
+    0/*Frame*/, 
+    0/*FrameRate*/, 
+    +1/*XChange*/, 
+    2/*XRate*/, 
+    +1/*YChange*/, 
+    8/*YRate*/, 
+    SPRITE_DETECT_EDGE | SPRITE_X_KEEPIN | SPRITE_Y_KEEPIN
+  );
+  Sprites.AddSprite(&Shape);
 }
 
 void setup() {
@@ -332,6 +362,8 @@ void setup() {
   setupFFTBins();
 
   setupText();
+
+  setupSprites();
 
   setupRandom();
 
@@ -725,8 +757,11 @@ void combineMatrixes() {
       // TODO: how are masks vs off going to be detected?
       // TODO: do we need a margin? maybe if text is scrolling skip the visualizer 
       // TODO: do we want the text to scroll at the same rate as the visualizer?
+      // TODO: text_matrix OR sprite_matrix
       if (text_matrix(numLEDsX - x, y)) {
         leds(x, y) = text_matrix(numLEDsX - x, y);
+      } else if (sprite_matrix(numLEDsX - x, y)) {
+        leds(x, y) = sprite_matrix(numLEDsX - x, y);
       } else {
         // TODO: else display visualizer (wrapping on the x axis)
         if (y < visualizerNumLEDsY) {
@@ -762,9 +797,11 @@ void loop() {
 
       // TODO: do more things based on touch
       // TODO: toggleFlashLightFromTouch();
+        // ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
+        // text_complete = false;
 
       if (text_complete) {
-        // TODO: button to trigger scrolling text
+        // TODO: check touch for button to trigger scrolling text
       }
 
       g_last_touch = g_current_touch;
@@ -789,43 +826,59 @@ void loop() {
   if (!text_complete) {
     EVERY_N_MILLIS(1000/25) {
       // draw text
-
       int scrolling_ret = ScrollingMsg.UpdateText();
       // DEBUG_PRINT("Scrolling ret: ");
       // DEBUG_PRINTLN(scrolling_ret);
       if (scrolling_ret == -1) {
         // when UpdateText returns -1, there is no more text to display
         text_complete = true;
-      } else if (scrolling_ret == 1) {
-        // when UpdateText returns 1, the "FLASHLIGHT" text is done being displayed
-        // toggle flashlight mode
-        g_flashlight_enabled = !g_flashlight_enabled;
-
-        if (g_brightness_flashlight) {
-          g_brightness = g_brightness_flashlight;
-        } else if (g_brightness_visualizer) {
-          g_brightness = g_brightness_visualizer;
-        }
       } else {
+        // UpdateText drew a new frame
         new_frame = true;
+
+        if (scrolling_ret == 1) {
+          // when UpdateText returns 1, "FLASHLIGHT" text and a delay is done being displayed
+          // toggle flashlight mode
+          g_flashlight_enabled = !g_flashlight_enabled;
+
+          if (g_brightness_flashlight) {
+            g_brightness = g_brightness_flashlight;
+          } else if (g_brightness_visualizer) {
+            g_brightness = g_brightness_visualizer;
+          }
+
+          // TODO: add a spinning white light in the front with sprites
+        }
+        // TODO: scrolling_ret to enable/disable sprites
       }
     }
   } else {
-    // TODO: draw sprites
-
-    // TODO: how often?
-    EVERY_N_SECONDS(10) {
+    EVERY_N_SECONDS(120) {
       // scroll text again
       // TODO: cycle between different text
       // TODO: instead of every_n_seconds, tie to touch sensor and to a bunch of visualizer columns hitting the top in a single frame
       // TODO: put this back to text_woowoo
-      ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
+      ScrollingMsg.SetText((unsigned char *)text_woowoo, sizeof(text_woowoo) - 1);
 
       ScrollingMsg.UpdateText();
 
       text_complete = false;
       new_frame = true;
     }
+  }
+
+  // draw sprites
+  EVERY_N_MILLIS(1000/25) {
+    fill_solid(sprite_matrix[0], sprite_matrix.Size(), CRGB::Black);
+
+    Sprites.UpdateSprites();
+
+    // TODO: do collision detection for pacman
+    //Sprites.DetectCollisions();
+
+    Sprites.RenderSprites();
+
+    new_frame = true;
   }
 
   if (new_frame) {
