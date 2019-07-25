@@ -38,12 +38,12 @@
 #define FREQUENCY_RESOLUTION_HZ 43
 
 enum touches {
-  brim_front,
-  brim_left,
-  brim_right,
-  brim_back,
-  top_front,
-  top_left,
-  top_right,
-  top_back,
+  brim_front = 0,
+  brim_left = 2,
+  brim_right = 4,
+  // brim_back = 3,
+  // top_front = 4,
+  // top_left = 5,
+  // top_right = 6,
+  // top_back = 7,
 };

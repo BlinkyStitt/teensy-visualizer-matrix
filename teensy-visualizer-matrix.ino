@@ -47,45 +47,45 @@ cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visua
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> text_matrix;
 cLEDText ScrollingMsg;
 
-cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> sprite_matrix;
-cLEDSprites Sprites(&sprite_matrix);
+// cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> sprite_matrix;
+// cLEDSprites Sprites(&sprite_matrix);
 
-#define SHAPE_FRAMES   4
-#define SHAPE_WIDTH    6
-#define SHAPE_HEIGHT   6
-const uint8_t ShapeData[] = 
-{
-  // frame 0
-  B8_1BIT(00110000),
-  B8_1BIT(01001000),
-  B8_1BIT(10000100),
-  B8_1BIT(10100100),
-  B8_1BIT(01001000),
-  B8_1BIT(00110000),
-  // frame 1
-  B8_1BIT(00110000),
-  B8_1BIT(01001000),
-  B8_1BIT(10100100),
-  B8_1BIT(10000100),
-  B8_1BIT(01001000),
-  B8_1BIT(00110000),
-  // frame 2
-  B8_1BIT(00110000),
-  B8_1BIT(01001000),
-  B8_1BIT(10010100),
-  B8_1BIT(10000100),
-  B8_1BIT(01001000),
-  B8_1BIT(00110000),
-  // frame 3
-  B8_1BIT(00110000),
-  B8_1BIT(01001000),
-  B8_1BIT(10000100),
-  B8_1BIT(10010100),
-  B8_1BIT(01001000),
-  B8_1BIT(00110000),
-};
-struct CRGB ColorTable[1] = { CRGB(64, 128, 255) };
-cSprite Shape(SHAPE_WIDTH, SHAPE_HEIGHT, ShapeData, SHAPE_FRAMES, _1BIT, ColorTable, ShapeData);
+// #define SHAPE_FRAMES   4
+// #define SHAPE_WIDTH    6
+// #define SHAPE_HEIGHT   6
+// const uint8_t ShapeData[] = 
+// {
+//   // frame 0
+//   B8_1BIT(00110000),
+//   B8_1BIT(01001000),
+//   B8_1BIT(10000100),
+//   B8_1BIT(10100100),
+//   B8_1BIT(01001000),
+//   B8_1BIT(00110000),
+//   // frame 1
+//   B8_1BIT(00110000),
+//   B8_1BIT(01001000),
+//   B8_1BIT(10100100),
+//   B8_1BIT(10000100),
+//   B8_1BIT(01001000),
+//   B8_1BIT(00110000),
+//   // frame 2
+//   B8_1BIT(00110000),
+//   B8_1BIT(01001000),
+//   B8_1BIT(10010100),
+//   B8_1BIT(10000100),
+//   B8_1BIT(01001000),
+//   B8_1BIT(00110000),
+//   // frame 3
+//   B8_1BIT(00110000),
+//   B8_1BIT(01001000),
+//   B8_1BIT(10000100),
+//   B8_1BIT(10010100),
+//   B8_1BIT(01001000),
+//   B8_1BIT(00110000),
+// };
+// struct CRGB ColorTable[1] = { CRGB(64, 128, 255) };
+// cSprite Shape(SHAPE_WIDTH, SHAPE_HEIGHT, ShapeData, SHAPE_FRAMES, _1BIT, ColorTable, ShapeData);
 
 // the text and sprites and visualizer get combined into this
 cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
@@ -110,8 +110,18 @@ uint16_t g_current_touch = 0;
 uint16_t g_last_touch = 0;
 uint16_t g_changed_touch = 0;
 
-bool g_flashlight_enabled = false;
-bool g_text_complete = false;
+enum flashlight_state {
+  off,
+  on,
+};
+flashlight_state g_flashlight_state = off;
+
+enum text_state {
+  none,
+  woowoo,
+  flashlight,
+};
+text_state g_text_state = none;
 
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
 unsigned long draw_micros = 0;
@@ -345,23 +355,25 @@ void setupText() {
 
   ScrollingMsg.SetText((unsigned char *)text_woowoo, sizeof(text_woowoo) - 1);
   ScrollingMsg.SetScrollDirection(SCROLL_LEFT);
+
+  g_text_state = woowoo;
 }
 
-void setupSprites() {
-  // sprites run at 60fps
-  Shape.SetPositionFrameMotionOptions(
-    0/*X*/, 
-    0/*Y*/, 
-    0/*Frame*/, 
-    8/*FrameRate*/, 
-    +1/*XChange*/, 
-    8/*XRate*/, 
-    +1/*YChange*/, 
-    16/*YRate*/, 
-    SPRITE_DETECT_EDGE | SPRITE_X_KEEPIN | SPRITE_Y_KEEPIN
-  );
-  Sprites.AddSprite(&Shape);
-}
+// void setupSprites() {
+//   // sprites run at 60fps
+//   Shape.SetPositionFrameMotionOptions(
+//     0/*X*/, 
+//     0/*Y*/, 
+//     0/*Frame*/, 
+//     8/*FrameRate*/, 
+//     +1/*XChange*/, 
+//     8/*XRate*/, 
+//     +1/*YChange*/, 
+//     16/*YRate*/, 
+//     SPRITE_DETECT_EDGE | SPRITE_X_KEEPIN | SPRITE_Y_KEEPIN
+//   );
+//   Sprites.AddSprite(&Shape);
+// }
 
 void setup() {
   debug_serial(115200, 2000);
@@ -388,7 +400,7 @@ void setup() {
 
   setupText();
 
-  setupSprites();
+  // setupSprites();
 
   setupRandom();
 
@@ -570,7 +582,7 @@ void mapFrequenciesToVisualizerMatrix() {
     uint8_t i = visualizerXtoFrequencyId[x];
 
     // draw a border
-    if (g_flashlight_enabled) {
+    if (g_flashlight_state == flashlight_state::on) {
       visualizer_matrix(shifted_x, 0) = visualizer_white;
       visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_white;
     } else {
@@ -684,11 +696,19 @@ void mapFrequenciesToVisualizerMatrix() {
   // TODO: debug timer
 }
 
-bool setBrightnessFromTouch() {
+bool setThingsFromTouch() {
   bool brightness_changed = false;
 
+  // TODO: zfill
+  DEBUG_PRINT("changed touch: ");
+  DEBUG_PRINTLN2(g_changed_touch, BIN);
+  DEBUG_PRINT("current touch: ");
+  DEBUG_PRINTLN2(g_current_touch, BIN);
+
   if (g_changed_touch & _BV(brim_left) && g_current_touch & _BV(brim_left)) {
-    // hold the brim front and tap brim_left to increase brightness
+    // TODO: require another input to be held?
+    // tap brim_left to increase brightness
+    // TODO: this is too slow. allow holding to continue decreasing
     if (g_brightness < max_brightness) {
       brightness_changed = true;
 
@@ -701,8 +721,10 @@ bool setBrightnessFromTouch() {
     } else {
       DEBUG_PRINTLN("Brightness @ max");
     }
-  } else if (g_changed_touch & _BV(brim_back) && g_current_touch & _BV(brim_back)) {
-    // hold the brim front and tap brim_back to decrease brightness
+  } else if (g_changed_touch & _BV(brim_right) && g_current_touch & _BV(brim_right)) {
+    // TODO: require another input to be held?
+    // tap brim_right to decrease brightness
+    // TODO: this is too slow. allow holding to continue decreasing
     if (g_brightness > min_brightness) {
       brightness_changed = true;
 
@@ -715,16 +737,39 @@ bool setBrightnessFromTouch() {
     } else {
       DEBUG_PRINTLN("Brightness @ min");
     }
+  } else if (g_changed_touch & _BV(brim_front) && g_current_touch & _BV(brim_front)) {
+    // tap brim_front to toggle flashlight
+    // TODO: make it so we have to hold it down for a moment
+    if (g_text_state == flashlight) {
+      // the button was pressed while we were already scrolling "flashlight". cancel the currently scrolling text
+      DEBUG_PRINTLN("Stopping flashlight text");
+
+      fill_solid(text_matrix[0], text_matrix.Size(), CRGB::Black);
+      g_text_state = none;
+    } else {
+      // start scrolling "flashlight"
+      // the flashlight will toggle once the message is done scrolling
+      DEBUG_PRINTLN("starting flashlight text");
+
+      fill_solid(text_matrix[0], text_matrix.Size(), CRGB::Black);
+      ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
+      g_text_state = flashlight;
+    }
   } else {
-    // TODO: if brim_front is held for 5 seconds without other touches, toggle flashlight mode
+    DEBUG_PRINTLN("unimplemented touches detected");
   }
 
   if (brightness_changed) {
-    if (g_flashlight_enabled) {
+    // save different brightness for flashlight and visualizer
+    if (g_flashlight_state == on) {
       g_brightness_flashlight = g_brightness;
     } else {
       g_brightness_visualizer = g_brightness;
     }
+  }
+
+  if (g_text_state == none) {
+    // TODO: check touch for button to trigger scrolling text
   }
 
   return brightness_changed;
@@ -795,10 +840,11 @@ void combineMatrixes() {
       // TODO: text_matrix OR sprite_matrix
       if (y < visualizerNumLEDsY && visualizer_matrix(vis_x, y) == visualizer_white) {
         leds(x, y) = visualizer_white;
-      } else if (!g_text_complete && text_matrix(numLEDsX - x, y) != black) {
+      } else if (g_text_state != none && text_matrix(numLEDsX - x, y) != black) {
+        // TODO: margin
         leds(x, y) = text_matrix(numLEDsX - x, y);
-      } else if (g_text_complete && sprite_matrix(numLEDsX - x, y) != black) {
-        leds(x, y) = sprite_matrix(numLEDsX - x, y);
+      // } else if (g_text_complete && sprite_matrix(numLEDsX - x, y) != black) {
+      //   leds(x, y) = sprite_matrix(numLEDsX - x, y);
       } else if (y < visualizerNumLEDsY) {
         leds(x, y) = visualizer_matrix(vis_x, y);
       } else {
@@ -820,19 +866,10 @@ void loop() {
 
       g_changed_touch = g_current_touch ^ g_last_touch;
 
-      if (setBrightnessFromTouch()) {
+      if (setThingsFromTouch()) {
         // we can wait for a next audio frame
         // new_frame = true;
       };
-
-      // TODO: do more things based on touch
-      // TODO: toggleFlashLightFromTouch();
-        // ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
-        // g_text_complete = false;
-
-      if (g_text_complete) {
-        // TODO: check touch for button to trigger scrolling text
-      }
 
       g_last_touch = g_current_touch;
     }
@@ -853,15 +890,15 @@ void loop() {
     new_frame = true;
   }
 
-  if (!g_text_complete) {
+  if (g_text_state != none) {
     EVERY_N_MILLIS(1000/25) {
       // draw text
       int scrolling_ret = ScrollingMsg.UpdateText();
       // DEBUG_PRINT("Scrolling ret: ");
       // DEBUG_PRINTLN(scrolling_ret);
       if (scrolling_ret == -1) {
-        // when UpdateText returns -1, there is no more text to display
-        g_text_complete = true;
+        // when UpdateText returns -1, there is no more text to display and text_matrix is empty
+        g_text_state = none;
       } else {
         // UpdateText drew a new frame
         new_frame = true;
@@ -869,17 +906,24 @@ void loop() {
         if (scrolling_ret == 1) {
           // when UpdateText returns 1, "FLASHLIGHT" text and a delay is done being displayed
           // toggle flashlight mode
-          g_flashlight_enabled = !g_flashlight_enabled;
+          if (g_flashlight_state == on) {
+            g_flashlight_state = off;
 
-          if (g_brightness_flashlight) {
-            g_brightness = g_brightness_flashlight;
-          } else if (g_brightness_visualizer) {
-            g_brightness = g_brightness_visualizer;
+            if (g_brightness_visualizer) {
+              g_brightness = g_brightness_visualizer;
+            }
+
+            // TODO: remove a spinning white light sprite in the front
+          } else {
+            g_flashlight_state = on;
+
+            if (g_brightness_flashlight) {
+              g_brightness = g_brightness_flashlight;
+            }
+
+            // TODO: add a spinning white light sprite in the front
           }
-
-          // TODO: add a spinning white light in the front with sprites
         }
-        // TODO: scrolling_ret to enable/disable sprites
       }
     }
   } else {
@@ -892,26 +936,26 @@ void loop() {
 
       ScrollingMsg.UpdateText();
 
-      g_text_complete = false;
+      g_text_state = woowoo;
       new_frame = true;
     }
   }
 
-  // draw sprites if not drawing text
-  if (g_text_complete) {
-    EVERY_N_MILLIS(1000/60) {
-      fill_solid(sprite_matrix[0], sprite_matrix.Size(), CRGB::Black);
+  // TODO: draw sprites if not drawing text
+  // if (g_text_complete) {
+  //   EVERY_N_MILLIS(1000/60) {
+  //     fill_solid(sprite_matrix[0], sprite_matrix.Size(), CRGB::Black);
 
-      Sprites.UpdateSprites();
+  //     Sprites.UpdateSprites();
 
-      // TODO: do collision detection for pacman
-      //Sprites.DetectCollisions();
+  //     // TODO: do collision detection for pacman
+  //     //Sprites.DetectCollisions();
 
-      Sprites.RenderSprites();
+  //     Sprites.RenderSprites();
 
-      new_frame = true;
-    }
-  }
+  //     new_frame = true;
+  //   }
+  // }
 
   if (new_frame) {
     combineMatrixes();

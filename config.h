@@ -129,9 +129,9 @@ const uint8_t fade_rate = 64;
 const float minMaxLevel = 0.15 / activate_difference;
 
 // https://github.com/AaronLiddiment/LEDText/wiki/4.Text-Array-&-Special-Character-Codes
-// TODO: do something with EFFECT_CUSTOM_RC
+// a space is 5 pixels wide. with a 64 pixel screen, we need 13 spaces (64/5 rounded up)
 const unsigned char text_woowoo[] = {
-  "           "
+  "             "
   EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WoOoOoO!"
   "  "
   EFFECT_HSV "\x00\xff\xff" "W"
@@ -146,7 +146,7 @@ const unsigned char text_woowoo[] = {
 
 // text runs at 25fps. so delaying 50 (0x32) frames = 2 seconds
 const unsigned char text_flashlight[] = {
-  "           "
+  "             "
   EFFECT_RGB "\xff\xff\xff" "FLASHLIGHT"
   EFFECT_DELAY_FRAMES "\x00\x32"
   " "
