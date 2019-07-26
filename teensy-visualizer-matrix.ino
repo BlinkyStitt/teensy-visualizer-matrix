@@ -1,5 +1,5 @@
 #define DEBUG
-// #define DEBUG_SERIAL_WAIT
+#define DEBUG_SERIAL_WAIT
 #include "bs_debug.h"
 
 #include <stdlib.h>
@@ -329,21 +329,27 @@ void setupAudio() {
 }
 
 void setupRandom() {
+  // use arduino's random to seed fastled's random
+  // FastLED's random is "significantly faster than Arduino random(), but also somewhat less random"
   randomSeed(analogRead(FLOATING_PIN));
-  // TODO: use fastled's random function instead?
+
+  random16_add_entropy(random((2^16)-1));
+  random16_add_entropy(random((2^16)-1));
+  random16_add_entropy(random((2^16)-1));
+  random16_add_entropy(random((2^16)-1));
 
   #ifdef DEBUG
     Serial.print("Random: ");
-    Serial.println(random(100));
+    Serial.println(random8(100));
 
     Serial.print("Random: ");
-    Serial.println(random(100));
+    Serial.println(random8(100));
 
     Serial.print("Random: ");
-    Serial.println(random(100));
+    Serial.println(random8(100));
 
     Serial.print("Random: ");
-    Serial.println(random(100));
+    Serial.println(random8(100));
   #endif
 }
 
@@ -640,7 +646,7 @@ void mapFrequenciesToVisualizerMatrix() {
             // loud_frame_counter++;
             // increment_loud_frame_counter = true;
 
-            uint8_t r = random(100);
+            uint8_t r = random8(100);
 
             // TODO: this doesn't work as well with the bars being two wide. need configurable 
             if (r < 34) {
