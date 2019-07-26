@@ -250,6 +250,11 @@ void setupLights() {
   // FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
 
   // we use the volume knob to set the default brightness
+  // sometimes the first read is 0, so give it multiple tries to wake up
+  setBrightnessFromVolumeKnob();
+  delay(100);
+  setBrightnessFromVolumeKnob();
+  delay(100);
   setBrightnessFromVolumeKnob();
 
   // TODO: default to brighter? (still max at 255 though)
@@ -328,9 +333,16 @@ void setupRandom() {
   // TODO: use fastled's random function instead?
 
   #ifdef DEBUG
+    Serial.print("Random: ");
     Serial.println(random(100));
+
+    Serial.print("Random: ");
     Serial.println(random(100));
+
+    Serial.print("Random: ");
     Serial.println(random(100));
+
+    Serial.print("Random: ");
     Serial.println(random(100));
   #endif
 }
@@ -891,7 +903,7 @@ void loop() {
   }
 
   if (g_text_state != none) {
-    EVERY_N_MILLIS(1000/25) {
+    EVERY_N_MILLIS(1000/20) {
       // draw text
       int scrolling_ret = ScrollingMsg.UpdateText();
       // DEBUG_PRINT("Scrolling ret: ");
