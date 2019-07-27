@@ -19,6 +19,9 @@ const uint8_t numLEDsX = 64;
 const uint8_t numLEDsY = 8;
 
 // each bin is FREQUENCY_RESOLUTION_HZ (43 Hz with teensy audio shield)
+// const uint16_t minBin = 0;
+// const uint16_t maxBin = 18000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18kHz
+
 const uint16_t minBin = 0;
 const uint16_t maxBin = 18000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18kHz
 
@@ -101,16 +104,19 @@ const uint8_t visualizerNumLEDsY = numLEDsY;
 
 // the shortest amount of time to leave an output on before starting to change it
 // it will stay on longer than this depending on time required to dim to off
-// https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
-// "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
-// 0.5 is added for rounding up
-const uint16_t minOnMs = 1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 337?
+// 200 bpm = 75 ms = 13.333 Hz
+// 150 bpm = 100 ms = 10 Hz
+// 130 bpm = 115.3 ms = 8.667 Hz
+const uint16_t minOnMs = 115; //1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 337?
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
 // change the pattern every X milliseconds
 uint16_t ms_per_shift[] = {
   // maximum speed (no seizure speed)
-  minOnMs,
+  // https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
+  // "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
+  // 0.5 is added for rounding up
+  // 1000.0 / 4.0 + 0.5,
   // slow speed
   uint16_t(42.0 * 1000.0 / float(numLEDsX) + 0.5),
   // ludicrous speed
@@ -120,28 +126,30 @@ uint16_t ms_per_shift[] = {
 };
 
 // how close a sound has to be to the loudest sound in order to activate
-const float activate_difference = 2.5 / 6.0;
+// TODO: change this. do things with decibles
+const float activate_difference = 4.0 / 7.0;
 // simple % decrease
 // TODO: not sure i like how decay and fade work. i want a more explicit link between this value and how long it takes to fade to black
 const float decayMax = 0.98;
 const uint8_t fade_rate = 64;
 // set a floor so that decayMax doesn't go too low
+// TODO: tune this with the volume knob?
 const float minMaxLevel = 0.15 / activate_difference;
 
 // https://github.com/AaronLiddiment/LEDText/wiki/4.Text-Array-&-Special-Character-Codes
 // a space is 5 pixels wide. with a 64 pixel screen, we need 13 spaces (64/5 rounded up)
 const unsigned char text_woowoo[] = {
   "             "
-  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WoOoOoO!"
-  "  "
-  EFFECT_HSV "\x00\xff\xff" "W"
-  EFFECT_HSV "\x20\xff\xff" "o"
-  EFFECT_HSV "\x40\xff\xff" "O"
-  EFFECT_HSV "\x60\xff\xff" "o"
-  EFFECT_HSV "\xe0\xff\xff" "O"
-  EFFECT_HSV "\xc0\xff\xff" "o"
-  EFFECT_HSV "\xa0\xff\xff" "O"
-  EFFECT_HSV "\x80\xff\xff" "! "
+  // EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WoOoOoO!"
+  // "  "
+  // EFFECT_HSV "\x00\xff\xff" "W"
+  // EFFECT_HSV "\x20\xff\xff" "o"
+  // EFFECT_HSV "\x40\xff\xff" "O"
+  // EFFECT_HSV "\x60\xff\xff" "o"
+  // EFFECT_HSV "\xe0\xff\xff" "O"
+  // EFFECT_HSV "\xc0\xff\xff" "o"
+  // EFFECT_HSV "\xa0\xff\xff" "O"
+  // EFFECT_HSV "\x80\xff\xff" "! "
 };
 
 // text runs at 25fps. so delaying 50 (0x32) frames = 2 seconds

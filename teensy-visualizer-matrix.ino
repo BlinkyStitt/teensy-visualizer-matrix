@@ -546,7 +546,7 @@ void mapFrequenciesToVisualizerMatrix() {
 
   static uint8_t last_frame_height[visualizerNumLEDsX] = {0};
   static uint8_t lowestIndexToLight = 1;  // 0 is the border
-  static uint8_t lowestIndexToLightWhite = 3;
+  static uint8_t lowestIndexToLightWhite = 4;// visualizerNumLEDsY - 1;
 
   // OPTION 1: cycle frames_per_shift every X seconds
   // TODO: every X seconds change the frames_per_shift
@@ -610,6 +610,7 @@ void mapFrequenciesToVisualizerMatrix() {
 
     if (i < numFreqBands && frequencies[i].average_scaled_magnitude > 0) {
       // use the value to calculate the height for this color
+      // TODO: maybe this should be different. dont do a logatharim
       uint8_t highestIndexToLight = map(frequencies[i].average_scaled_magnitude, 1, 255, lowestIndexToLight, visualizerNumLEDsY - 1);
 
       for (uint8_t y = lowestIndexToLight; y <= visualizerNumLEDsY - 1; y++) {
@@ -657,7 +658,7 @@ void mapFrequenciesToVisualizerMatrix() {
               }
             } else if (r < 67) {
               // TODO: maybe instead of EVERY_N_SECONDS, have a timer for each x?
-              EVERY_N_SECONDS(3) {
+              EVERY_N_SECONDS(12) {
                 // if we hit the top, light both ends white and flip this for the next time
                 visualizer_matrix(shifted_x, 0) = visualizer_white;
 
