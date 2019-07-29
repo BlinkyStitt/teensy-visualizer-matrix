@@ -117,9 +117,9 @@ uint16_t ms_per_shift[] = {
   // https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
   // "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
   // 0.5 is added for rounding up
-  // uint16_t(1000.0 / 4.0 + 0.5),
+  uint16_t(1000.0 / 4.0 + 0.5),
   // slow speed
-  10000,
+  // 10000,
   // 2000,
   // 42 second rotation
   uint16_t(42 * 1000.0 / float(numLEDsX) + 0.5),

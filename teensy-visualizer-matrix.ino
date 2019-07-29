@@ -603,10 +603,6 @@ void mapFrequenciesToVisualizerMatrix() {
 
     // if this column is on or should be turned on
     if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0.01)) {
-      if (millis() < frequencies[i].nextOnMs) {
-        // nevermind! we need to wait longer before changing this in order to reduce flicker
-        continue;
-      }
 
       // use the value to calculate the height for this color
       // TODO: this should be an exponential scale
@@ -616,28 +612,37 @@ void mapFrequenciesToVisualizerMatrix() {
 
       // TODO: these should be on a different struct dedicated to the matrix
       if (highestIndexToLight != frequencies[i].level) {
+        bool level_changed = true;
         if (highestIndexToLight > frequencies[i].level) {
           // if the bar is growing...
-          // let it grow. i don't think we need to do anything special
+
+          if (millis() < frequencies[i].nextOnMs) {
+            // nevermind! we need to wait longer before changing this in order to reduce flicker
+            highestIndexToLight = frequencies[i].level;
+            level_changed = false;
+          }
         } else {
           // if the bar is shrinking, limit to shrinking 1 level per X ms...
           if (millis() < frequencies[i].nextOnMs) {
             // nevermind! we need to wait longer before changing this in order to reduce flicker
-            continue;
+            highestIndexToLight = frequencies[i].level;
+            level_changed = false;
+          } else {
+            highestIndexToLight = frequencies[i].level - 1;
           }
-
-          highestIndexToLight = frequencies[i].level - 1;
         }
 
-        frequencies[i].level = highestIndexToLight;
+        if (level_changed) {
+          frequencies[i].level = highestIndexToLight;
 
-        // the level has changed! set timers to prevent flicker
-        // two timers so that lights can turn off slower than they turn on
-        // TODO: not sure about this. one timer still feels like the right thing to me
-        frequencies[i].nextOnMs = millis() + minOnMs;
+          // the level has changed! set timers to prevent flicker
+          // two timers so that lights can turn off slower than they turn on
+          // TODO: not sure about this. one timer still feels like the right thing to me
+          frequencies[i].nextOnMs = millis() + minOnMs;
 
-        // TODO: i want it to take how many ms to fall from the top to bottom?
-        frequencies[i].nextOffMs = millis() + minOnMs;
+          // TODO: i want it to take how many ms to fall from the top to bottom?
+          frequencies[i].nextOffMs = millis() + minOnMs;
+        }
       }
 
       for (uint8_t y = lowestIndexToLight; y <= visualizerNumLEDsY - 1; y++) {
