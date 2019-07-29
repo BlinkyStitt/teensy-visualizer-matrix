@@ -35,11 +35,15 @@ uint16_t freqBands[numFreqBands];
 struct frequency {
   float current_magnitude;
   float max_magnitude;
-  uint8_t average_scaled_magnitude; // exponential moving average of current_magnitude divided by max_magnitude
-  unsigned long turnOnMs;  // keep track of when we turned a light on so they don't flicker when we change them
-  unsigned long turnOffMs;  // keep track of when we turned a light on so they don't flicker when we turn them off
+  float average_scaled_magnitude; // exponential moving average of current_magnitude divided by max_magnitude
+  uint8_t level;  // TODO: name this better. its the highest index we are lighting in the visualizer matrix. it shouldn't be on this struct either
+  unsigned long nextOnMs;  // keep track of when we turned a light on so they don't flicker when we change them
+  unsigned long nextOffMs;  // keep track of when we turned a light on so they don't flicker when we change them
 };
-frequency frequencies[numFreqBands] = {0, 0, 0, 0, 0};
+frequency frequencies[numFreqBands] = {0, 0, 0, 0, 0, 0};
+
+float g_max_magnitude = 0;
+float g_max_average_scaled_magnitude = 0;
 
 // TODO: move this to a seperate file so that we can support multiple led/el light combinations
 cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
@@ -426,7 +430,7 @@ void setup() {
 }
 
 // we could/should pass fft and level as args
-float updateLevelsFromFFT() {
+void updateLevelsFromFFT() {
   // https://forum.pjrc.com/threads/32677-Is-there-a-logarithmic-function-for-FFT-bin-selection-for-any-given-of-bands
 
   // read the FFT frequencies into numOutputs levels
@@ -456,75 +460,50 @@ float updateLevelsFromFFT() {
     }
   }
 
-  return overall_max;
+  g_max_magnitude = overall_max;
 }
 
 void updateFrequencies() {
   // read FFT frequency data into a bunch of levels. assign each level a color and a brightness
-  float overall_max = updateLevelsFromFFT();
+  updateLevelsFromFFT();
 
   // exponential moving average
-  float alpha = 0.98;
+  float up_alpha = 0.98;  // if going up, give the new measure a heavy weight
+  float down_alpha = 0.5;  // if going down, give the new measure an equal
   float alphaScale = 1.0;
 
+  float max_average_scaled_magnitude = 0;
+
   for (uint16_t i = 0; i < numFreqBands; i++) {
+
     // check if current magnitude is close to the max magnitude
-
+    // TODO: don't scale linearly. sounds have to have a lot more energy in order to sound twice as loud
     // TODO: instead of scaling to an overall max. scale to some average of the overall and this frequency's max
+    float scaled_reading = frequencies[i].current_magnitude / g_max_magnitude;
 
-    if (frequencies[i].current_magnitude >= overall_max * activate_difference) {
-      if (millis() < frequencies[i].turnOnMs) {
-        // nevermind! we need to wait longer before changing this in order to reduce flicker
-        continue;
-      }
+    // cut off the bottom
+    // TODO: learn more about decibles and phons. do something fancier
+    // scaled_reading = map(scaled_reading, 0.0, 1.0, -0.3, 1.0);
 
-      float scaled_reading = frequencies[i].current_magnitude / overall_max * 255;
-      float lastOutput = frequencies[i].average_scaled_magnitude;
+    float last_reading = frequencies[i].average_scaled_magnitude;
 
-      uint8_t ema = (alpha * scaled_reading + (alphaScale - alpha) * lastOutput) / alphaScale;
-
-      uint8_t lastOutputDecreased = frequencies[i].average_scaled_magnitude * decayMax;
-      if (lastOutputDecreased < fade_rate) {
-        lastOutputDecreased = 0;
-      } else {
-        lastOutputDecreased -= fade_rate;
-      }
-
-      if (ema > lastOutputDecreased) {
-        // if the magnitude is increasing, or only a little less than the current value set it to the ema
-        frequencies[i].average_scaled_magnitude = ema;
-      } else {
-        // if the magnitude is decreasing, decrease at a fixed rate
-        frequencies[i].average_scaled_magnitude = lastOutputDecreased;
-      }
-
-      // make sure we stay on for a minimum amount of time. this prevents flickering if the magnitude changes quickly
-      frequencies[i].turnOnMs = millis() + minOnMs / 2.1;
-      frequencies[i].turnOffMs = millis() + minOnMs;
-    } else {  // if (frequencies[i].current_magnitude < overall_max * activate_difference)
-      // the current magnitude is not close to the max magnitude. turn it down if we have waited long enough
-
-      if (millis() < frequencies[i].turnOffMs) { 
-        // nevermind! we need to wait longer to reduce flicker
-        continue;
-      }
-
-      // TODO: i dont think this does exactly what we want here. we divide value by max. go back to using fade_factor?
-      frequencies[i].max_magnitude *= decayMax;
-
-      if (frequencies[i].average_scaled_magnitude == 0) {
-        // this light is already off
-        continue;
-      }
- 
-      // the output has been on for at least minOnMs and is quiet now. turn it down
-
-      // reduce the brightness at 2x the rate we reduce max level
-      // TODO: maybe change this to be more directly tied to time to reach 0
-      frequencies[i].average_scaled_magnitude *= decayMax;
-      frequencies[i].average_scaled_magnitude *= decayMax;
+    if (scaled_reading < last_reading) {
+      frequencies[i].average_scaled_magnitude = (down_alpha * scaled_reading + (alphaScale - down_alpha) * last_reading) / alphaScale;
+    } else {
+      frequencies[i].average_scaled_magnitude = (up_alpha * scaled_reading + (alphaScale - up_alpha) * last_reading) / alphaScale;
     }
+
+    if (frequencies[i].average_scaled_magnitude < activate_difference) {
+      // the current magnitude is not close to the max magnitude. decay the max
+      // TODO: i dont think this does exactly what we want here
+      // TODO: we used to only do this if turnOfMs had passed, but now we decrease more often
+      frequencies[i].max_magnitude *= decayMax;
+    }
+
+    max_average_scaled_magnitude = max(max_average_scaled_magnitude, frequencies[i].average_scaled_magnitude);
   }
+
+  g_max_average_scaled_magnitude = max_average_scaled_magnitude;
 }
 
 // TODO: args instead of globals
@@ -608,10 +587,44 @@ void mapFrequenciesToVisualizerMatrix() {
       visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_color;
     }
 
-    if (i < numFreqBands && frequencies[i].average_scaled_magnitude > 0) {
+    // if this column is on or should be turned on
+    if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].average_scaled_magnitude > 0.01)) {
+      if (millis() < frequencies[i].nextOnMs) {
+        // nevermind! we need to wait longer before changing this in order to reduce flicker
+        continue;
+      }
+
       // use the value to calculate the height for this color
-      // TODO: maybe this should be different. dont do a logatharim
-      uint8_t highestIndexToLight = map(frequencies[i].average_scaled_magnitude, 1, 255, lowestIndexToLight, visualizerNumLEDsY - 1);
+      // TODO: this should be an exponential scale
+      // TODO: i'm never seeing the max on this
+      // TODO: why do we need -2?!
+      uint8_t highestIndexToLight = map(constrain(frequencies[i].average_scaled_magnitude, 0.0, 1.0), 0.0, 1.0, 0, visualizerNumLEDsY - 1);
+
+      // TODO: these should be on a different struct dedicated to the matrix
+      if (highestIndexToLight != frequencies[i].level) {
+        if (highestIndexToLight > frequencies[i].level) {
+          // if the bar is growing...
+          // let it grow. i don't think we need to do anything special
+        } else {
+          // if the bar is shrinking, limit to shrinking 1 level per X ms...
+          if (millis() < frequencies[i].nextOnMs) {
+            // nevermind! we need to wait longer before changing this in order to reduce flicker
+            continue;
+          }
+
+          highestIndexToLight = frequencies[i].level - 1;
+        }
+
+        frequencies[i].level = highestIndexToLight;
+
+        // the level has changed! set timers to prevent flicker
+        // two timers so that lights can turn off slower than they turn on
+        // TODO: not sure about this. one timer still feels like the right thing to me
+        frequencies[i].nextOnMs = millis() + minOnMs;
+
+        // TODO: i want it to take how many ms to fall from the top to bottom?
+        frequencies[i].nextOffMs = millis() + minOnMs;
+      }
 
       for (uint8_t y = lowestIndexToLight; y <= visualizerNumLEDsY - 1; y++) {
         uint8_t shifted_y = y;
@@ -658,7 +671,7 @@ void mapFrequenciesToVisualizerMatrix() {
               }
             } else if (r < 67) {
               // TODO: maybe instead of EVERY_N_SECONDS, have a timer for each x?
-              EVERY_N_SECONDS(12) {
+              EVERY_N_SECONDS(6) {
                 // if we hit the top, light both ends white and flip this for the next time
                 visualizer_matrix(shifted_x, 0) = visualizer_white;
 
@@ -677,6 +690,17 @@ void mapFrequenciesToVisualizerMatrix() {
       }
     } else {
       // the visualizer (but not the border!) should be off
+
+      if (i < numFreqBands) {
+        if (millis() < frequencies[i].nextOffMs) { 
+          // nevermind! we need to wait longer to reduce flicker
+          // TODO: we might not need this
+          continue;
+        }
+
+        frequencies[i].level = 0;
+      }
+
       for (uint8_t y = lowestIndexToLight; y < numLEDsY - 1; y++) {
         // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
         // TODO: fading looks bad since they all fade at even rate and we want the top light to turn off first
@@ -988,16 +1012,24 @@ void loop() {
 
     // debug print
     #ifdef DEBUG
+      Serial.print(g_max_average_scaled_magnitude, 2);
+      Serial.print(" / ");
+      Serial.print(g_max_magnitude, 2);
+      Serial.print(" = ");
+      Serial.print(g_max_average_scaled_magnitude / g_max_magnitude, 2);
+      Serial.print(" ");
+
       for (uint16_t i = 0; i < numFreqBands; i++) {
         Serial.print("| ");
 
         // TODO: maybe do something with parity here? 
         // do some research
 
-        if (frequencies[i].average_scaled_magnitude > 0) {
-          Serial.print(frequencies[i].average_scaled_magnitude / 255.0, 2);
+        if (frequencies[i].level > 0) {
+          Serial.print(frequencies[i].level);
+          Serial.print(" ");
         } else {
-          Serial.print("    ");
+          Serial.print("  ");
         }
       }
       Serial.print("| ");

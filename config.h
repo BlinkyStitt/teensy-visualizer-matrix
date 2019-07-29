@@ -107,7 +107,8 @@ const uint8_t visualizerNumLEDsY = numLEDsY;
 // 200 bpm = 75 ms = 13.333 Hz
 // 150 bpm = 100 ms = 10 Hz
 // 130 bpm = 115.3 ms = 8.667 Hz
-const uint16_t minOnMs = 115; //1000.0 / 4.0 + 0.5; // 118? 150? 169? 184? 200? 250? 337?
+// minimum ms to show a light before allowing it (and sometimes surrounding lights) to change
+const uint16_t minOnMs = 118; // 118? 150? 169? 184? 200? 250? 337?
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
 // change the pattern every X milliseconds
@@ -116,9 +117,11 @@ uint16_t ms_per_shift[] = {
   // https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
   // "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
   // 0.5 is added for rounding up
-  // 1000.0 / 4.0 + 0.5,
+  uint16_t(1000.0 / 4.0 + 0.5),
   // slow speed
-  uint16_t(42.0 * 1000.0 / float(numLEDsX) + 0.5),
+  // 2000,
+  // 42 second rotation
+  uint16_t(42 * 1000.0 / float(numLEDsX) + 0.5),
   // ludicrous speed
   26,
   // full throttle
@@ -131,7 +134,6 @@ const float activate_difference = 4.0 / 7.0;
 // simple % decrease
 // TODO: not sure i like how decay and fade work. i want a more explicit link between this value and how long it takes to fade to black
 const float decayMax = 0.98;
-const uint8_t fade_rate = 64;
 // set a floor so that decayMax doesn't go too low
 // TODO: tune this with the volume knob?
 const float minMaxLevel = 0.15 / activate_difference;
