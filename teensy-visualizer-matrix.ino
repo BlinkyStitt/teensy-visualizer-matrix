@@ -34,16 +34,19 @@ uint16_t freqBands[numFreqBands];
 // keep track of the max volume for each frequency band (slowly decays)
 struct frequency {
   float current_magnitude;
+  float ema_magnitude;
   float max_magnitude;
-  float average_scaled_magnitude; // exponential moving average of current_magnitude divided by max_magnitude
+  float averaged_scaled_magnitude; // exponential moving average of current_magnitude divided by max_magnitude
   uint8_t level;  // TODO: name this better. its the highest index we are lighting in the visualizer matrix. it shouldn't be on this struct either
   unsigned long nextOnMs;  // keep track of when we turned a light on so they don't flicker when we change them
   unsigned long nextOffMs;  // keep track of when we turned a light on so they don't flicker when we change them
 };
-frequency frequencies[numFreqBands] = {0, 0, 0, 0, 0, 0};
+frequency frequencies[numFreqBands] = {0, 0, 0, 0, 0, 0, 0};
 
-float g_max_magnitude = 0;
-float g_max_average_scaled_magnitude = 0;
+float g_highest_current_magnitude = 0;
+float g_highest_ema_magnitude = 0;
+float g_highest_max_magnitude = 0;
+// float g_max_average_scaled_magnitude = 0;
 
 // TODO: move this to a seperate file so that we can support multiple led/el light combinations
 cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
@@ -438,7 +441,7 @@ void updateLevelsFromFFT() {
   // is linear, so for the higher octaves, read
   // many FFT bins together.
 
-  float overall_max = minMaxLevel;
+  float highest_current = 0;
 
   for (uint16_t i = 0; i < numFreqBands; i++) {
     if (i < numFreqBands - 1) {
@@ -448,19 +451,21 @@ void updateLevelsFromFFT() {
       frequencies[i].current_magnitude = fft1024.read(freqBands[numFreqBands - 1], maxBin);
     }
 
-    if (frequencies[i].current_magnitude > frequencies[i].max_magnitude) {
-      frequencies[i].max_magnitude = frequencies[i].current_magnitude;
-    }
+    // if (frequencies[i].current_magnitude > frequencies[i].max_magnitude) {
+    //   frequencies[i].max_magnitude = frequencies[i].current_magnitude;
+    // }
 
-    if (frequencies[i].max_magnitude < minMaxLevel) {
-      // don't let the max ever go to zero so that it turns off when its quiet instead of activating at a whisper
-      frequencies[i].max_magnitude = minMaxLevel;
-    } else if (frequencies[i].max_magnitude > overall_max) {
-      overall_max = frequencies[i].max_magnitude;
-    }
+    // if (frequencies[i].max_magnitude < minMaxLevel) {
+    //   // don't let the max ever go to zero so that it turns off when its quiet instead of activating at a whisper
+    //   frequencies[i].max_magnitude = minMaxLevel;
+    // } else if (frequencies[i].max_magnitude > overall_max) {
+    //   overall_max = frequencies[i].max_magnitude;
+    // }
+
+    highest_current = max(highest_current, frequencies[i].current_magnitude);
   }
 
-  g_max_magnitude = overall_max;
+  g_highest_current_magnitude = highest_current;
 }
 
 void updateFrequencies() {
@@ -469,41 +474,50 @@ void updateFrequencies() {
 
   // exponential moving average
   float up_alpha = 0.98;  // if going up, give the new measure a heavy weight
-  float down_alpha = 0.5;  // if going down, give the new measure an equal
+  float down_alpha = 0.98;  // TODO: if going down...
   float alphaScale = 1.0;
 
-  float max_average_scaled_magnitude = 0;
+  float max_ema_magnitude = 0;
+  // float max_averaged_scaled_magnitude = 0;
 
   for (uint16_t i = 0; i < numFreqBands; i++) {
 
-    // check if current magnitude is close to the max magnitude
     // TODO: don't scale linearly. sounds have to have a lot more energy in order to sound twice as loud
     // TODO: instead of scaling to an overall max. scale to some average of the overall and this frequency's max
-    float scaled_reading = frequencies[i].current_magnitude / g_max_magnitude;
+    float current_reading = frequencies[i].current_magnitude;
 
     // cut off the bottom
     // TODO: learn more about decibles and phons. do something fancier
     // scaled_reading = map(scaled_reading, 0.0, 1.0, -0.3, 1.0);
 
-    float last_reading = frequencies[i].average_scaled_magnitude;
+    float last_reading = frequencies[i].ema_magnitude;
 
-    if (scaled_reading < last_reading) {
-      frequencies[i].average_scaled_magnitude = (down_alpha * scaled_reading + (alphaScale - down_alpha) * last_reading) / alphaScale;
+    if (current_reading < last_reading) {
+      frequencies[i].ema_magnitude = (down_alpha * current_reading + (alphaScale - down_alpha) * last_reading) / alphaScale;
     } else {
-      frequencies[i].average_scaled_magnitude = (up_alpha * scaled_reading + (alphaScale - up_alpha) * last_reading) / alphaScale;
+      frequencies[i].ema_magnitude = (up_alpha * current_reading + (alphaScale - up_alpha) * last_reading) / alphaScale;
     }
 
-    if (frequencies[i].average_scaled_magnitude < activate_difference) {
-      // the current magnitude is not close to the max magnitude. decay the max
-      // TODO: i dont think this does exactly what we want here
-      // TODO: we used to only do this if turnOfMs had passed, but now we decrease more often
-      frequencies[i].max_magnitude *= decayMax;
-    }
-
-    max_average_scaled_magnitude = max(max_average_scaled_magnitude, frequencies[i].average_scaled_magnitude);
+    max_ema_magnitude = max(max_ema_magnitude, frequencies[i].ema_magnitude);
   }
 
-  g_max_average_scaled_magnitude = max_average_scaled_magnitude;
+  g_highest_ema_magnitude = max_ema_magnitude;
+
+  g_highest_max_magnitude = max(g_highest_current_magnitude, g_highest_ema_magnitude);
+
+  g_highest_max_magnitude = max(g_highest_max_magnitude, minMaxLevel);
+
+  float activate_threshold = g_highest_max_magnitude * activate_difference;
+
+  for (uint16_t i = 0; i < numFreqBands; i++) {
+    if (frequencies[i].ema_magnitude >= activate_threshold) {
+      frequencies[i].averaged_scaled_magnitude = frequencies[i].ema_magnitude / g_highest_max_magnitude;
+
+      // TODO: scale this more? cut off the bottom
+    } else {
+      frequencies[i].averaged_scaled_magnitude = 0;
+    }
+  }
 }
 
 // TODO: args instead of globals
@@ -588,7 +602,7 @@ void mapFrequenciesToVisualizerMatrix() {
     }
 
     // if this column is on or should be turned on
-    if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].average_scaled_magnitude > 0.01)) {
+    if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0.01)) {
       if (millis() < frequencies[i].nextOnMs) {
         // nevermind! we need to wait longer before changing this in order to reduce flicker
         continue;
@@ -598,7 +612,7 @@ void mapFrequenciesToVisualizerMatrix() {
       // TODO: this should be an exponential scale
       // TODO: i'm never seeing the max on this
       // TODO: why do we need -2?!
-      uint8_t highestIndexToLight = map(constrain(frequencies[i].average_scaled_magnitude, 0.0, 1.0), 0.0, 1.0, 0, visualizerNumLEDsY - 1);
+      uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, 0.0, 1.0, 0, visualizerNumLEDsY - 1);
 
       // TODO: these should be on a different struct dedicated to the matrix
       if (highestIndexToLight != frequencies[i].level) {
@@ -1012,11 +1026,11 @@ void loop() {
 
     // debug print
     #ifdef DEBUG
-      Serial.print(g_max_average_scaled_magnitude, 2);
+      Serial.print(g_highest_ema_magnitude, 2);
       Serial.print(" / ");
-      Serial.print(g_max_magnitude, 2);
+      Serial.print(g_highest_max_magnitude, 2);
       Serial.print(" = ");
-      Serial.print(g_max_average_scaled_magnitude / g_max_magnitude, 2);
+      Serial.print(g_highest_ema_magnitude / g_highest_max_magnitude, 2);
       Serial.print(" ");
 
       for (uint16_t i = 0; i < numFreqBands; i++) {

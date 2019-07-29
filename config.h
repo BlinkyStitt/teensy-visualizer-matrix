@@ -108,7 +108,7 @@ const uint8_t visualizerNumLEDsY = numLEDsY;
 // 150 bpm = 100 ms = 10 Hz
 // 130 bpm = 115.3 ms = 8.667 Hz
 // minimum ms to show a light before allowing it (and sometimes surrounding lights) to change
-const uint16_t minOnMs = 118; // 118? 150? 169? 184? 200? 250? 337?
+const uint16_t minOnMs = 200; // 118? 150? 169? 184? 200? 250? 337?
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
 // change the pattern every X milliseconds
@@ -117,8 +117,9 @@ uint16_t ms_per_shift[] = {
   // https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
   // "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
   // 0.5 is added for rounding up
-  uint16_t(1000.0 / 4.0 + 0.5),
+  // uint16_t(1000.0 / 4.0 + 0.5),
   // slow speed
+  10000,
   // 2000,
   // 42 second rotation
   uint16_t(42 * 1000.0 / float(numLEDsX) + 0.5),
