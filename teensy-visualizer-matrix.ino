@@ -504,8 +504,9 @@ void updateFrequencies() {
 
   g_highest_ema_magnitude = max_ema_magnitude;
 
-  g_highest_max_magnitude = max(g_highest_current_magnitude, g_highest_ema_magnitude);
-
+  // g_highest_max_magnitude = max(previous frame's g_highest_max_magnitude * decayMax, g_highest_ema_magnitude, minMaxLevel)
+  // g_highest_max_magnitude = max(g_highest_max_magnitude, g_highest_current_magnitude); // skip this! on loud sounds, it is always >ema which means we never get 1.0 for avg_scaled_magnitude
+  g_highest_max_magnitude = max(g_highest_max_magnitude * decayMax, g_highest_ema_magnitude);
   g_highest_max_magnitude = max(g_highest_max_magnitude, minMaxLevel);
 
   float activate_threshold = g_highest_max_magnitude * activate_difference;
@@ -606,9 +607,7 @@ void mapFrequenciesToVisualizerMatrix() {
     if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0.01)) {
 
       // use the value to calculate the height for this color
-      // TODO: this should be an exponential scale
-      // TODO: i'm never seeing the max on this
-      // TODO: why do we need -2?!
+      // TODO: this should be an exponential scale, but first figure out why i'm rarely seeing the max on this
       uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, 0.0, 1.0, 0, visualizerNumLEDsY - 1);
 
       // TODO: these should be on a different struct dedicated to the matrix
@@ -990,7 +989,7 @@ void loop() {
       }
     }
   } else {
-    EVERY_N_SECONDS(120) {
+    EVERY_N_SECONDS(540) {
       // scroll text again
       // TODO: cycle between different text
       // TODO: instead of every_n_seconds, tie to touch sensor and to a bunch of visualizer columns hitting the top in a single frame
