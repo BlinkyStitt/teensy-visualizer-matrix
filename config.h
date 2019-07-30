@@ -131,35 +131,35 @@ uint16_t ms_per_shift[] = {
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: change this. do things with decibles
-const float activate_difference = 4.0 / 7.0;
+const float activate_difference = 5.0 / 7.0;
 // simple % decrease
 // TODO: not sure i like how decay and fade work. i want a more explicit link between this value and how long it takes to fade to black
 const float decayMax = 0.98;
-// set a floor so that decayMax doesn't go too low
+// set a floor so that the "maximum" magnitude used as a divisor doesn't go too low
 // TODO: tune this with the volume knob?
-const float minMaxLevel = 0.15 / activate_difference;
+const float minMaxLevel = 0.26;
 
 // https://github.com/AaronLiddiment/LEDText/wiki/4.Text-Array-&-Special-Character-Codes
 // a space is 5 pixels wide. with a 64 pixel screen, we need 13 spaces (64/5 rounded up)
 const unsigned char text_woowoo[] = {
   "             "
-  // EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WoOoOoO!"
-  // "  "
-  // EFFECT_HSV "\x00\xff\xff" "W"
-  // EFFECT_HSV "\x20\xff\xff" "o"
-  // EFFECT_HSV "\x40\xff\xff" "O"
-  // EFFECT_HSV "\x60\xff\xff" "o"
-  // EFFECT_HSV "\xe0\xff\xff" "O"
-  // EFFECT_HSV "\xc0\xff\xff" "o"
-  // EFFECT_HSV "\xa0\xff\xff" "O"
-  // EFFECT_HSV "\x80\xff\xff" "! "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WOOOOOO!"
+  "  "
+  EFFECT_HSV "\x00\xff\xff" "W"
+  EFFECT_HSV "\x20\xff\xff" "O"
+  EFFECT_HSV "\x40\xff\xff" "O"
+  EFFECT_HSV "\x60\xff\xff" "O"
+  EFFECT_HSV "\xe0\xff\xff" "O"
+  EFFECT_HSV "\xc0\xff\xff" "O"
+  EFFECT_HSV "\xa0\xff\xff" "O"
+  EFFECT_HSV "\x80\xff\xff" "! "
 };
 
-// text runs at 25fps. so delaying 50 (0x32) frames = 2 seconds
+// text runs at 11.11fps. so delaying 22 (0x32) frames = 2 seconds
 const unsigned char text_flashlight[] = {
   "             "
   EFFECT_RGB "\xff\xff\xff" "FLASHLIGHT"
-  EFFECT_DELAY_FRAMES "\x00\x32"
+  EFFECT_DELAY_FRAMES "\x00\x16"
   " "
   EFFECT_CUSTOM_RC "\x01"
 };

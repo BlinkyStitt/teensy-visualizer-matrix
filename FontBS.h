@@ -6,6 +6,7 @@
 #include <LEDText.h>
 #endif
 
+// TODO: lower case letters?
 const uint8_t BSFontData[] = {
 	7,		// Font Width
 	6,		// Font Height
@@ -19,12 +20,12 @@ const uint8_t BSFontData[] = {
 	B8(00000000),
 	B8(00000000),
 
-	B8(00011000),	// Char !
-	B8(00011000),
-	B8(00011000),
-	B8(00011000),
+	B8(01110000),	// Char !
+	B8(01110000),
+	B8(01110000),
+	B8(01110000),
 	B8(00000000),
-	B8(00011000),
+	B8(01110000),
 
 	B8(00110110),	// Char "
 	B8(00110110),

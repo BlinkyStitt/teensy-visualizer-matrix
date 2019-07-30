@@ -1,13 +1,13 @@
 #define DEBUG
 // #define DEBUG_SERIAL_WAIT
-#include "bs_debug.h"
+// TODO: publish this
+#include <bs_debug.h>
 
 #include <stdlib.h>
 
 #include <Adafruit_MPR121.h>
 #include <Audio.h>
 #include <FastLED.h>
-#include <FontMatrise.h>
 #include <LEDMatrix.h>
 #include <LEDSprites.h>
 #include <LEDText.h>
@@ -17,6 +17,7 @@
 #include <SerialFlash.h>
 #include <Wire.h>
 
+#include "FontBS.h"
 #include "config.h"
 
 #if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
@@ -374,9 +375,9 @@ void setupTouch() {
 }
 
 void setupText() {
-  ScrollingMsg.SetFont(MatriseFontData);
+  ScrollingMsg.SetFont(BSFontData);
 
-  ScrollingMsg.Init(&text_matrix, text_matrix.Width(), ScrollingMsg.FontHeight() + 1, 0, 0);
+  ScrollingMsg.Init(&text_matrix, text_matrix.Width(), ScrollingMsg.FontHeight() + 1, 0, 1);
 
   ScrollingMsg.SetText((unsigned char *)text_woowoo, sizeof(text_woowoo) - 1);
   ScrollingMsg.SetScrollDirection(SCROLL_LEFT);
@@ -511,9 +512,9 @@ void updateFrequencies() {
 
   for (uint16_t i = 0; i < numFreqBands; i++) {
     if (frequencies[i].ema_magnitude >= activate_threshold) {
+      // TODO: include log here somehow. maybe convert to decibel spl?
+      // frequencies[i].averaged_scaled_magnitude = 20 * log(frequencies[i].ema_magnitude / g_highest_max_magnitude);
       frequencies[i].averaged_scaled_magnitude = frequencies[i].ema_magnitude / g_highest_max_magnitude;
-
-      // TODO: scale this more? cut off the bottom
     } else {
       frequencies[i].averaged_scaled_magnitude = 0;
     }
@@ -811,7 +812,7 @@ bool setThingsFromTouch() {
     } else {
       // start scrolling "flashlight"
       // the flashlight will toggle once the message is done scrolling
-      DEBUG_PRINTLN("starting flashlight text");
+      DEBUG_PRINTLN("Starting flashlight text");
 
       fill_solid(text_matrix[0], text_matrix.Size(), CRGB::Black);
       ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
@@ -953,7 +954,7 @@ void loop() {
   }
 
   if (g_text_state != none) {
-    EVERY_N_MILLIS(1000/20) {
+    EVERY_N_MILLIS(90) {
       // draw text
       int scrolling_ret = ScrollingMsg.UpdateText();
       // DEBUG_PRINT("Scrolling ret: ");
