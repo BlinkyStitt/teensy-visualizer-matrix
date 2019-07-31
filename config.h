@@ -143,19 +143,6 @@ const float minMaxLevel = 0.26;
 // a character is 6 pixels wide. with a 64 pixel screen, we have 10 characters max (64/6 rounded down)
 // TODO: proportional font?
 // TODO: split this into a bunch of different messages. 2 different woos. and other fun text
-const unsigned char text_woowoo[] = {
-  "           "
-  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WOOOOOO!"
-  "  "
-  EFFECT_HSV "\x00\xff\xff" "W"
-  EFFECT_HSV "\x20\xff\xff" "O"
-  EFFECT_HSV "\x40\xff\xff" "O"
-  EFFECT_HSV "\x60\xff\xff" "O"
-  EFFECT_HSV "\xe0\xff\xff" "O"
-  EFFECT_HSV "\xc0\xff\xff" "O"
-  EFFECT_HSV "\xa0\xff\xff" "O"
-  EFFECT_HSV "\x80\xff\xff" "! "
-};
 
 // text runs at 11.11fps. so delaying 22 (0x32) frames = 2 seconds
 const unsigned char text_flashlight[] = {
@@ -166,3 +153,35 @@ const unsigned char text_flashlight[] = {
   " "
   EFFECT_CUSTOM_RC "\x01"
 };
+
+const unsigned char text_woo1[] = {
+  "           "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WOOOOOO!"
+};
+
+const unsigned char text_woo2[] = {
+  "           "
+  EFFECT_HSV "\x00\xff\xff" "W"
+  EFFECT_HSV "\x20\xff\xff" "O"
+  EFFECT_HSV "\x40\xff\xff" "O"
+  EFFECT_HSV "\x60\xff\xff" "O"
+  EFFECT_HSV "\xe0\xff\xff" "O"
+  EFFECT_HSV "\xc0\xff\xff" "O"
+  EFFECT_HSV "\xa0\xff\xff" "O"
+  EFFECT_HSV "\x80\xff\xff" "! "
+};
+
+const unsigned char text_debug[] = {
+  "           "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ! ?"
+};
+
+enum ScrollingText {
+  none,
+  flashlight,
+  debug,
+  WOO_MESSAGE,
+  woo1,
+  woo2,
+  WOO_MESSAGE_END,
+} g_scrolling_text;

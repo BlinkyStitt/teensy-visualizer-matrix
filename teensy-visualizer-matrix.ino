@@ -124,13 +124,6 @@ enum flashlight_state {
 };
 flashlight_state g_flashlight_state = off;
 
-enum text_state {
-  none,
-  woowoo,
-  flashlight,
-};
-text_state g_text_state = none;
-
 // used to keep track of framerate // TODO: remove this if debug mode is disabled
 unsigned long draw_micros = 0;
 unsigned long last_update_micros = 0;
@@ -379,10 +372,59 @@ void setupText() {
 
   ScrollingMsg.Init(&text_matrix, text_matrix.Width(), ScrollingMsg.FontHeight() + 1, 0, 1);
 
-  ScrollingMsg.SetText((unsigned char *)text_woowoo, sizeof(text_woowoo) - 1);
   ScrollingMsg.SetScrollDirection(SCROLL_LEFT);
 
-  g_text_state = woowoo;
+  setText(debug);
+}
+
+
+ScrollingText nextWooMessage() {
+  static ScrollingText next_woo = (ScrollingText)(WOO_MESSAGE + 1); 
+
+  ScrollingText result = next_woo;
+
+  next_woo = (ScrollingText)(next_woo + 1);
+  if (next_woo == WOO_MESSAGE_END) {
+    next_woo = (ScrollingText)(WOO_MESSAGE + 1);
+  }
+
+  return result;
+}
+
+void setText(ScrollingText text) {
+  if (text == WOO_MESSAGE || text == WOO_MESSAGE_END) {
+    text = nextWooMessage();
+  }
+
+  // TODO: make this optional?
+  fill_solid(text_matrix[0], text_matrix.Size(), CRGB::Black);
+
+  g_scrolling_text = text;
+
+  unsigned char *text_chars;
+  unsigned long text_len;
+
+  if (text == none) {
+    text_chars = (unsigned char *)text_woo1;
+    text_len = 0;
+  } else if (text == debug) {
+    text_chars = (unsigned char *)text_debug;
+    text_len = sizeof(text_debug);
+  } else if (text == flashlight) {
+    text_chars = (unsigned char *)text_flashlight;
+    text_len = sizeof(text_flashlight) - 1;
+  } else if (text == woo1) {
+    text_chars = (unsigned char *)text_woo1;
+    text_len = sizeof(text_woo1) - 1;
+  } else if (text == woo2) {
+    text_chars = (unsigned char *)text_woo2;
+    text_len = sizeof(text_woo2) - 1;
+  } else {
+    Serial.println("ERROR");
+    return;
+  }
+
+  ScrollingMsg.SetText(text_chars, text_len);
 }
 
 // void setupSprites() {
@@ -605,9 +647,8 @@ void mapFrequenciesToVisualizerMatrix() {
 
     // if this column is on or should be turned on
     if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0.01)) {
-
-      // use the value to calculate the height for this color
-      // TODO: this should be an exponential scale, but first figure out why i'm rarely seeing the max on this
+      // use the averaged_scaled_magnitude to calculate the height for this color
+      // TODO: this should be an exponential scale. i think we can use findE()
       uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, 0.0, 1.0, 0, visualizerNumLEDsY - 1);
 
       // TODO: these should be on a different struct dedicated to the matrix
@@ -802,20 +843,15 @@ bool setThingsFromTouch() {
   } else if (g_changed_touch & _BV(brim_front) && g_current_touch & _BV(brim_front)) {
     // tap brim_front to toggle flashlight
     // TODO: make it so we have to hold it down for a moment
-    if (g_text_state == flashlight) {
+    if (g_scrolling_text == flashlight) {
       // the button was pressed while we were already scrolling "flashlight". cancel the currently scrolling text
       DEBUG_PRINTLN("Stopping flashlight text");
-
-      fill_solid(text_matrix[0], text_matrix.Size(), CRGB::Black);
-      g_text_state = none;
+      setText(none);
     } else {
       // start scrolling "flashlight"
       // the flashlight will toggle once the message is done scrolling
       DEBUG_PRINTLN("Starting flashlight text");
-
-      fill_solid(text_matrix[0], text_matrix.Size(), CRGB::Black);
-      ScrollingMsg.SetText((unsigned char *)text_flashlight, sizeof(text_flashlight) - 1);
-      g_text_state = flashlight;
+      setText(flashlight);
     }
   } else {
     DEBUG_PRINTLN("unimplemented touches detected");
@@ -830,9 +866,9 @@ bool setThingsFromTouch() {
     }
   }
 
-  if (g_text_state == none) {
-    // TODO: check touch for button to trigger scrolling text
-  }
+  // TODO: check touch for button to trigger scrolling text
+  // if (g_scrolling_text == none) {
+  // }
 
   return brightness_changed;
 }
@@ -902,9 +938,11 @@ void combineMatrixes() {
       // TODO: text_matrix OR sprite_matrix
       if (y < visualizerNumLEDsY && visualizer_matrix(vis_x, y) == visualizer_white) {
         leds(x, y) = visualizer_white;
-      } else if (g_text_state != none && text_matrix(numLEDsX - x, y) != black) {
+      } else if (g_scrolling_text != none && text_matrix(numLEDsX - 1 - x, y) != black) {
         // TODO: margin
-        leds(x, y) = text_matrix(numLEDsX - x, y);
+        // TODO: this seems to be missing a column
+        // why is this backwards, but the other matrixes aren't?
+        leds(x, y) = text_matrix(numLEDsX - 1 - x, y);
       // } else if (g_text_complete && sprite_matrix(numLEDsX - x, y) != black) {
       //   leds(x, y) = sprite_matrix(numLEDsX - x, y);
       } else if (y < visualizerNumLEDsY) {
@@ -952,7 +990,7 @@ void loop() {
     new_frame = true;
   }
 
-  if (g_text_state != none) {
+  if (g_scrolling_text != none) {
     EVERY_N_MILLIS(90) {
       // draw text
       int scrolling_ret = ScrollingMsg.UpdateText();
@@ -960,7 +998,7 @@ void loop() {
       // DEBUG_PRINTLN(scrolling_ret);
       if (scrolling_ret == -1) {
         // when UpdateText returns -1, there is no more text to display and text_matrix is empty
-        g_text_state = none;
+        g_scrolling_text = none;
       } else {
         // UpdateText drew a new frame
         new_frame = true;
@@ -989,16 +1027,15 @@ void loop() {
       }
     }
   } else {
-    EVERY_N_SECONDS(540) {
+    EVERY_N_SECONDS(30) {
       // scroll text again
       // TODO: cycle between different text
       // TODO: instead of every_n_seconds, tie to touch sensor and to a bunch of visualizer columns hitting the top in a single frame
       // TODO: put this back to text_woowoo
-      ScrollingMsg.SetText((unsigned char *)text_woowoo, sizeof(text_woowoo) - 1);
+      setText(WOO_MESSAGE);
 
       ScrollingMsg.UpdateText();
 
-      g_text_state = woowoo;
       new_frame = true;
     }
   }
