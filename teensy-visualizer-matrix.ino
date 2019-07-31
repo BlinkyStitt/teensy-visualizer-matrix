@@ -939,8 +939,7 @@ void combineMatrixes() {
       if (y < visualizerNumLEDsY && visualizer_matrix(vis_x, y) == visualizer_white) {
         leds(x, y) = visualizer_white;
       } else if (g_scrolling_text != none && text_matrix(numLEDsX - 1 - x, y) != black) {
-        // TODO: margin
-        // TODO: this seems to be missing a column
+        // TODO: mask?
         // why is this backwards, but the other matrixes aren't?
         leds(x, y) = text_matrix(numLEDsX - 1 - x, y);
       // } else if (g_text_complete && sprite_matrix(numLEDsX - x, y) != black) {
@@ -1027,7 +1026,7 @@ void loop() {
       }
     }
   } else {
-    EVERY_N_SECONDS(30) {
+    EVERY_N_SECONDS(540) {
       // scroll text again
       // TODO: cycle between different text
       // TODO: instead of every_n_seconds, tie to touch sensor and to a bunch of visualizer columns hitting the top in a single frame
