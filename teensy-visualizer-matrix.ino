@@ -385,6 +385,7 @@ ScrollingText nextWooMessage() {
 
   next_woo = (ScrollingText)(next_woo + 1);
   if (next_woo == WOO_MESSAGE_END) {
+    // TODO: randomize the order every loop. maybe shuffle 4 "decks" of words together so they can sometimes double up
     next_woo = (ScrollingText)(WOO_MESSAGE + 1);
   }
 
@@ -404,6 +405,7 @@ void setText(ScrollingText text) {
   unsigned char *text_chars;
   unsigned long text_len;
 
+  // i miss rust's match statement
   if (text == none) {
     text_chars = (unsigned char *)text_woo1;
     text_len = 0;
@@ -419,8 +421,14 @@ void setText(ScrollingText text) {
   } else if (text == woo2) {
     text_chars = (unsigned char *)text_woo2;
     text_len = sizeof(text_woo2) - 1;
+  } else if (text == party) {
+    text_chars = (unsigned char *)text_party;
+    text_len = sizeof(text_party) - 1;
+  } else if (text == dance) {
+    text_chars = (unsigned char *)text_dance;
+    text_len = sizeof(text_dance) - 1;
   } else {
-    Serial.println("ERROR");
+    Serial.println("ERROR! Missed handling a ScrollingText enum");
     return;
   }
 
@@ -1026,11 +1034,11 @@ void loop() {
       }
     }
   } else {
-    EVERY_N_SECONDS(540) {
+    // TODO: how often?
+    EVERY_N_SECONDS(300) {
       // scroll text again
       // TODO: cycle between different text
       // TODO: instead of every_n_seconds, tie to touch sensor and to a bunch of visualizer columns hitting the top in a single frame
-      // TODO: put this back to text_woowoo
       setText(WOO_MESSAGE);
 
       ScrollingMsg.UpdateText();

@@ -171,6 +171,16 @@ const unsigned char text_woo2[] = {
   EFFECT_HSV "\x80\xff\xff" "! "
 };
 
+const unsigned char text_party[] = {
+  "           "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "PARTY!"
+};
+
+const unsigned char text_dance[] = {
+  "           "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "DANCE!"
+};
+
 const unsigned char text_debug[] = {
   "           "
   EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ! ?"
@@ -183,5 +193,7 @@ enum ScrollingText {
   WOO_MESSAGE,
   woo1,
   woo2,
+  party,
+  dance,
   WOO_MESSAGE_END,
 } g_scrolling_text;
