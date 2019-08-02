@@ -36,7 +36,7 @@ uint16_t freqBands[numFreqBands];
 struct frequency {
   float current_magnitude;
   float ema_magnitude;
-  float averaged_scaled_magnitude; // exponential moving average of current_magnitude divided by max_magnitude
+  float averaged_scaled_magnitude; // exponential moving average of current_magnitude divided by overall max_magnitude
   uint8_t level;  // TODO: name this better. its the highest index we are lighting in the visualizer matrix. it shouldn't be on this struct either
   unsigned long nextChangeMs;  // keep track of when we turned a light on so they don't flicker when we change them
 };
@@ -45,7 +45,6 @@ frequency frequencies[numFreqBands] = {0, 0, 0, 0, 0};
 float g_highest_current_magnitude = 0;
 float g_highest_ema_magnitude = 0;
 float g_highest_max_magnitude = 0;
-// float g_max_average_scaled_magnitude = 0;
 
 // TODO: move this to a seperate file so that we can support multiple led/el light combinations
 cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
