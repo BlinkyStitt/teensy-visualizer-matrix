@@ -36,13 +36,11 @@ uint16_t freqBands[numFreqBands];
 struct frequency {
   float current_magnitude;
   float ema_magnitude;
-  float max_magnitude;
   float averaged_scaled_magnitude; // exponential moving average of current_magnitude divided by max_magnitude
   uint8_t level;  // TODO: name this better. its the highest index we are lighting in the visualizer matrix. it shouldn't be on this struct either
-  unsigned long nextOnMs;  // keep track of when we turned a light on so they don't flicker when we change them
-  unsigned long nextOffMs;  // keep track of when we turned a light on so they don't flicker when we change them
+  unsigned long nextChangeMs;  // keep track of when we turned a light on so they don't flicker when we change them
 };
-frequency frequencies[numFreqBands] = {0, 0, 0, 0, 0, 0, 0};
+frequency frequencies[numFreqBands] = {0, 0, 0, 0, 0};
 
 float g_highest_current_magnitude = 0;
 float g_highest_ema_magnitude = 0;
@@ -502,17 +500,6 @@ void updateLevelsFromFFT() {
       frequencies[i].current_magnitude = fft1024.read(freqBands[numFreqBands - 1], maxBin);
     }
 
-    // if (frequencies[i].current_magnitude > frequencies[i].max_magnitude) {
-    //   frequencies[i].max_magnitude = frequencies[i].current_magnitude;
-    // }
-
-    // if (frequencies[i].max_magnitude < minMaxLevel) {
-    //   // don't let the max ever go to zero so that it turns off when its quiet instead of activating at a whisper
-    //   frequencies[i].max_magnitude = minMaxLevel;
-    // } else if (frequencies[i].max_magnitude > overall_max) {
-    //   overall_max = frequencies[i].max_magnitude;
-    // }
-
     highest_current = max(highest_current, frequencies[i].current_magnitude);
   }
 
@@ -665,14 +652,14 @@ void mapFrequenciesToVisualizerMatrix() {
         if (highestIndexToLight > frequencies[i].level) {
           // if the bar is growing...
 
-          if (millis() < frequencies[i].nextOnMs) {
+          if (millis() < frequencies[i].nextChangeMs) {
             // nevermind! we need to wait longer before changing this in order to reduce flicker
             highestIndexToLight = frequencies[i].level;
             level_changed = false;
           }
         } else {
           // if the bar is shrinking, limit to shrinking 1 level per X ms...
-          if (millis() < frequencies[i].nextOnMs) {
+          if (millis() < frequencies[i].nextChangeMs) {
             // nevermind! we need to wait longer before changing this in order to reduce flicker
             highestIndexToLight = frequencies[i].level;
             level_changed = false;
@@ -684,13 +671,9 @@ void mapFrequenciesToVisualizerMatrix() {
         if (level_changed) {
           frequencies[i].level = highestIndexToLight;
 
-          // the level has changed! set timers to prevent flicker
-          // two timers so that lights can turn off slower than they turn on
-          // TODO: not sure about this. one timer still feels like the right thing to me
-          frequencies[i].nextOnMs = millis() + minOnMs;
-
-          // TODO: i want it to take how many ms to fall from the top to bottom?
-          frequencies[i].nextOffMs = millis() + minOnMs;
+          // the level has changed! set timer to prevent flicker
+          // TODO: two timers so that lights can turn off slower than they turn on?
+          frequencies[i].nextChangeMs = millis() + minOnMs;
         }
       }
 
@@ -760,7 +743,7 @@ void mapFrequenciesToVisualizerMatrix() {
       // the visualizer (but not the border!) should be off
 
       if (i < numFreqBands) {
-        if (millis() < frequencies[i].nextOffMs) { 
+        if (millis() < frequencies[i].nextChangeMs) {
           // nevermind! we need to wait longer to reduce flicker
           // TODO: we might not need this
           continue;
