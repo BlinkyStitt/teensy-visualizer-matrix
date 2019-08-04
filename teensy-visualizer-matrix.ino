@@ -36,7 +36,8 @@ uint16_t freqBands[numFreqBands];
 struct frequency {
   float current_magnitude;
   float ema_magnitude;
-  float averaged_scaled_magnitude; // exponential moving average of current_magnitude divided by overall max_magnitude
+  // float ema_db_spl;
+  uint8_t averaged_scaled_magnitude; // exponential moving average of current_magnitude divided by overall max_magnitude
   uint8_t level;  // TODO: name this better. its the highest index we are lighting in the visualizer matrix. it shouldn't be on this struct either
   unsigned long nextChangeMs;  // keep track of when we turned a light on so they don't flicker when we change them
 };
@@ -327,14 +328,17 @@ void setupAudio() {
 }
 
 void setupRandom() {
+  // randomSeed takes unsigned long, but analogRead only gives an int
+  unsigned long seed = 0;
+  for (int i = 0; i < __SIZEOF_LONG__ / __SIZEOF_INT__; i++) {
+    seed |= analogRead(FLOATING_PIN)<<(i * 8);
+  }
+
   // use arduino's random to seed fastled's random
   // FastLED's random is "significantly faster than Arduino random(), but also somewhat less random"
-  randomSeed(analogRead(FLOATING_PIN));
+  randomSeed(seed);
 
-  random16_add_entropy(random((2^16)-1));
-  random16_add_entropy(random((2^16)-1));
-  random16_add_entropy(random((2^16)-1));
-  random16_add_entropy(random((2^16)-1));
+  random16_add_entropy(random(UINT32_MAX));
 
   #ifdef DEBUG
     Serial.print("Random: ");
@@ -471,11 +475,13 @@ void setup() {
 
   setupFFTBins();
 
+  // setupMatrixLevels();
+
+  setupRandom();
+
   setupText();
 
   // setupSprites();
-
-  setupRandom();
 
   Serial.println("Starting...");
 }
@@ -489,7 +495,7 @@ void updateLevelsFromFFT() {
   // is linear, so for the higher octaves, read
   // many FFT bins together.
 
-  float highest_current = 0;
+  float highest = 0;
 
   for (uint16_t i = 0; i < numFreqBands; i++) {
     if (i < numFreqBands - 1) {
@@ -499,11 +505,17 @@ void updateLevelsFromFFT() {
       frequencies[i].current_magnitude = fft1024.read(freqBands[numFreqBands - 1], maxBin);
     }
 
-    highest_current = max(highest_current, frequencies[i].current_magnitude);
+    highest = max(highest, frequencies[i].current_magnitude);
   }
 
-  g_highest_current_magnitude = highest_current;
+  g_highest_current_magnitude = highest;
 }
+
+// // https://forum.pjrc.com/threads/33390-FFT-convert-real-values-to-decibles
+// float db(float n, float r) {
+//   if (n <= 0) return r - 96;  // or whatever you consider to be "off"
+//   return r + log10f(n) * 20.0f;
+// }
 
 void updateFrequencies() {
   // read FFT frequency data into a bunch of levels. assign each level a color and a brightness
@@ -514,8 +526,7 @@ void updateFrequencies() {
   float down_alpha = 0.98;  // TODO: if going down...
   float alphaScale = 1.0;
 
-  float max_ema_magnitude = 0;
-  // float max_averaged_scaled_magnitude = 0;
+  float highest_ema_magnitude = 0;
 
   for (uint16_t i = 0; i < numFreqBands; i++) {
 
@@ -535,10 +546,15 @@ void updateFrequencies() {
       frequencies[i].ema_magnitude = (up_alpha * current_reading + (alphaScale - up_alpha) * last_reading) / alphaScale;
     }
 
-    max_ema_magnitude = max(max_ema_magnitude, frequencies[i].ema_magnitude);
+    // TODO: is this right? the pjrc forum that I got this function from had a comment about using 94 for db spl, but it doesn't feel right to me
+    // frequencies[i].ema_db_spl = db(frequencies[i].ema_magnitude, 94);
+
+    // TODO: convert db_spl to phon or some other curve to match human hearing 
+
+    highest_ema_magnitude = max(highest_ema_magnitude, frequencies[i].ema_magnitude);
   }
 
-  g_highest_ema_magnitude = max_ema_magnitude;
+  g_highest_ema_magnitude = highest_ema_magnitude;
 
   // g_highest_max_magnitude = max(previous frame's g_highest_max_magnitude * decayMax, g_highest_ema_magnitude, minMaxLevel)
   // g_highest_max_magnitude = max(g_highest_max_magnitude, g_highest_current_magnitude); // skip this! on loud sounds, it is always >ema which means we never get 1.0 for avg_scaled_magnitude
@@ -550,8 +566,8 @@ void updateFrequencies() {
   for (uint16_t i = 0; i < numFreqBands; i++) {
     if (frequencies[i].ema_magnitude >= activate_threshold) {
       // TODO: include log here somehow. maybe convert to decibel spl?
-      // frequencies[i].averaged_scaled_magnitude = 20 * log(frequencies[i].ema_magnitude / g_highest_max_magnitude);
-      frequencies[i].averaged_scaled_magnitude = frequencies[i].ema_magnitude / g_highest_max_magnitude;
+      // frequencies[i].averaged_scaled_magnitude = 10 * log10f(frequencies[i].ema_magnitude / g_highest_max_magnitude);
+      frequencies[i].averaged_scaled_magnitude = constrain(frequencies[i].ema_magnitude / g_highest_max_magnitude, 0.0f, 1.0f) * 255;
     } else {
       frequencies[i].averaged_scaled_magnitude = 0;
     }
@@ -640,10 +656,10 @@ void mapFrequenciesToVisualizerMatrix() {
     }
 
     // if this column is on or should be turned on
-    if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0.01)) {
+    if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0)) {
       // use the averaged_scaled_magnitude to calculate the height for this color
       // TODO: this should be an exponential scale. i think we can use findE()
-      uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, 0.0, 1.0, 0, visualizerNumLEDsY - 1);
+      uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, 0, 255, 0, visualizerNumLEDsY - 1);
 
       // TODO: these should be on a different struct dedicated to the matrix
       if (highestIndexToLight != frequencies[i].level) {
