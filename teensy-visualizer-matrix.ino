@@ -330,8 +330,13 @@ void setupAudio() {
 void setupRandom() {
   // randomSeed takes unsigned long, but analogRead only gives an int
   unsigned long seed = 0;
-  for (int i = 0; i < __SIZEOF_LONG__ / __SIZEOF_INT__; i++) {
-    seed |= analogRead(FLOATING_PIN)<<(i * 8);
+
+  for (int i = 0; i < 100; i++) {
+    unsigned long seed_temp = 0;
+    for (int i = 0; i < __SIZEOF_LONG__ / __SIZEOF_INT__; i++) {
+      seed_temp |= analogRead(FLOATING_PIN)<<(i * 8);
+    }
+    seed += seed_temp;
   }
 
   // use arduino's random to seed fastled's random
