@@ -331,10 +331,13 @@ void setupRandom() {
   // randomSeed takes unsigned long, but analogRead only gives an int
   unsigned long seed = 0;
 
-  for (int i = 0; i < 100; i++) {
+  // TODO: how many times? we aren't using this for crypto, so once was probably fine
+  // someone said analogReady only gives 1-2 bits of entropy
+  // another person said we should only care about the lowest byte
+  for (int i = 0; i < 256; i++) {
     unsigned long seed_temp = 0;
     for (int i = 0; i < __SIZEOF_LONG__ / __SIZEOF_INT__; i++) {
-      seed_temp |= analogRead(FLOATING_PIN)<<(i * 8);
+      seed_temp |= analogRead(FLOATING_PIN)<<(i * __SIZEOF_INT__ * 8);
     }
     seed ^= seed_temp;
   }
@@ -347,15 +350,27 @@ void setupRandom() {
 
   #ifdef DEBUG
     Serial.print("Random: ");
-    Serial.println(random8(100));
+    Serial.println(random(100));
 
     Serial.print("Random: ");
-    Serial.println(random8(100));
+    Serial.println(random(100));
 
     Serial.print("Random: ");
-    Serial.println(random8(100));
+    Serial.println(random(100));
 
     Serial.print("Random: ");
+    Serial.println(random(100));
+
+    Serial.print("Random8: ");
+    Serial.println(random8(100));
+
+    Serial.print("Random8: ");
+    Serial.println(random8(100));
+
+    Serial.print("Random8: ");
+    Serial.println(random8(100));
+
+    Serial.print("Random8: ");
     Serial.println(random8(100));
   #endif
 }
