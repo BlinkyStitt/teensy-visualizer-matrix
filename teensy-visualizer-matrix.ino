@@ -336,7 +336,7 @@ void setupRandom() {
     for (int i = 0; i < __SIZEOF_LONG__ / __SIZEOF_INT__; i++) {
       seed_temp |= analogRead(FLOATING_PIN)<<(i * 8);
     }
-    seed += seed_temp;
+    seed ^= seed_temp;
   }
 
   // use arduino's random to seed fastled's random
