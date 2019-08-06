@@ -300,6 +300,9 @@ void setupLights() {
   Serial.println("Showing blue...");
   colorPattern(CRGB::Blue);
   FastLED.delay(1500);
+
+  FastLED.clear(true);
+  FastLED.show();
 }
 
 void setupAudio() {
