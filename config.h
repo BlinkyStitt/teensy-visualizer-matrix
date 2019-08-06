@@ -131,7 +131,7 @@ uint16_t ms_per_shift[] = {
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: change this. do things with decibles
-const float activate_difference = 4.0 / 7.0;
+const float activate_difference = 3.5 / 7.0;
 // simple % decrease
 // TODO: not sure i like how decay and fade work. i want a more explicit link between this value and how long it takes to fade to black
 const float decayMax = 0.995;
