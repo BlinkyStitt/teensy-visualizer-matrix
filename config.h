@@ -108,7 +108,7 @@ const uint8_t visualizerNumLEDsY = numLEDsY;
 // 150 bpm = 100 ms = 10 Hz
 // 130 bpm = 115.3 ms = 8.667 Hz
 // minimum ms to show a light before allowing it (and sometimes surrounding lights) to change
-const uint16_t minOnMs = 220; // 118? 150? 169? 184? 200? 250? 337?
+const uint16_t minOnMs = 200; // 118? 150? 169? 184? 200? 250? 337?
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
 // change the pattern every X milliseconds
@@ -149,8 +149,6 @@ const unsigned char text_flashlight[] = {
   "       "
   EFFECT_RGB "\xff\xff\xff"
   "LIGHT "
-  EFFECT_DELAY_FRAMES "\x00\x16"
-  " "
   EFFECT_CUSTOM_RC "\x01"
 };
 

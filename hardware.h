@@ -40,6 +40,6 @@
 enum touches {
   brim_front = 0,
   top = 2,
-  brim_left = 4,  // blue
-  brim_right = 6,  // green
+  brim_left = 4,
+  brim_right = 6,
 };
