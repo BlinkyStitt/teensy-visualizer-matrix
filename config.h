@@ -108,7 +108,7 @@ const uint8_t visualizerNumLEDsY = numLEDsY;
 // 150 bpm = 100 ms = 10 Hz
 // 130 bpm = 115.3 ms = 8.667 Hz
 // minimum ms to show a light before allowing it (and sometimes surrounding lights) to change
-const uint16_t minOnMs = 200; // 118? 150? 169? 184? 200? 250? 337?
+const uint16_t minOnMs = 220; // 118? 150? 169? 184? 200? 250? 337?
 // TODO: round minOnMs to be a multiple of ms_per_frame
 
 // change the pattern every X milliseconds
@@ -117,12 +117,12 @@ uint16_t ms_per_shift[] = {
   // https://www.epilepsy.com/learn/triggers-seizures/photosensitivity-and-seizures
   // "Generally, flashing lights most likely to trigger seizures are between the frequency of 5 to 30 flashes per second (Hertz)."
   // 0.5 is added for rounding up
-  uint16_t(1000.0 / 4.0 + 0.5),
+  uint16_t(1000.0f / 4.0f + 0.5f),
   // slow speed
   // 10000,
   // 2000,
   // 42 second rotation
-  uint16_t(42 * 1000.0 / float(numLEDsX) + 0.5),
+  uint16_t(42.0f * 1000.0f / float(numLEDsX) + 0.5f),
   // ludicrous speed
   26,
   // full throttle
@@ -131,36 +131,36 @@ uint16_t ms_per_shift[] = {
 
 // how close a sound has to be to the loudest sound in order to activate
 // TODO: change this. do things with decibles
-const float activate_difference = 3.5 / 7.0;
+const float activate_difference = 4.0f / 7.0f;
 // simple % decrease
 // TODO: not sure i like how decay and fade work. i want a more explicit link between this value and how long it takes to fade to black
-const float decayMax = 0.995;
+const float decayMax = 0.995f;
 // set a floor so that the "maximum" magnitude used as a divisor doesn't go too low
 // TODO: tune this with the volume knob?
-const float minMaxLevel = 0.26;
+const float minMaxLevel = 0.26f;
 
 // https://github.com/AaronLiddiment/LEDText/wiki/4.Text-Array-&-Special-Character-Codes
-// a character is 6 pixels wide. with a 64 pixel screen, we have 10 characters max (64/6 rounded down)
+// a space character is 8 pixels wide. with a 64 pixel screen, we need 8 spaces to clear the screen
 // TODO: proportional font?
 // TODO: split this into a bunch of different messages. 2 different woos. and other fun text
 
 // text runs at 11.11fps. so delaying 22 (0x32) frames = 2 seconds
 const unsigned char text_flashlight[] = {
-  "           "
+  "       "
   EFFECT_RGB "\xff\xff\xff"
-  "LIGHT    "
+  "LIGHT "
   EFFECT_DELAY_FRAMES "\x00\x16"
   " "
   EFFECT_CUSTOM_RC "\x01"
 };
 
 const unsigned char text_woo1[] = {
-  "           "
-  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WOOOOOO!"
+  "        "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "WOOOOOO! "
 };
 
 const unsigned char text_woo2[] = {
-  "           "
+  "        "
   EFFECT_HSV "\x00\xff\xff" "W"
   EFFECT_HSV "\x20\xff\xff" "O"
   EFFECT_HSV "\x40\xff\xff" "O"
@@ -172,28 +172,40 @@ const unsigned char text_woo2[] = {
 };
 
 const unsigned char text_party[] = {
-  "           "
-  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "PARTY!"
+  "        "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "PARTY! "
 };
 
 const unsigned char text_dance[] = {
-  "           "
-  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "DANCE!"
+  "        "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "DANCE! "
+};
+
+const unsigned char text_gambino[] = {
+  "        "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "CHILDISH GAMBINO! "
 };
 
 const unsigned char text_debug[] = {
-  "           "
-  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff" "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ! ?"
+  "        "
+  EFFECT_HSV_AH "\x00\xff\xff\xff\xff\xff"
+  "HI THERE! "
+  // "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z "
+  // "0 1 2 3 4 5 6 7 8 9 "
+  // "! \" # $ % & '( ) * + , - . / "
+  // ": ; < = > ? @ "
+  // "[ \\ ] ^ _ ` "
 };
 
 enum ScrollingText {
   none,
   flashlight,
   debug,
-  WOO_MESSAGE,
+  CHEER,
   woo1,
+  gambino,
   woo2,
   party,
   dance,
-  WOO_MESSAGE_END,
+  CHEER_END,
 } g_scrolling_text;

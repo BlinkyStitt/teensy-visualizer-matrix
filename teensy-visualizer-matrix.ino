@@ -1,4 +1,5 @@
 #define DEBUG
+#define DEBUG_VERBOSE
 // #define DEBUG_SERIAL_WAIT
 // TODO: publish this
 #include <bs_debug.h>
@@ -385,6 +386,10 @@ void setupTouch() {
 
   if (g_touch_available) {
     Serial.println("MPR121 found.");
+
+    // cap.setThresholds(12, 6);  // this is the default
+    cap.setThresholds(48, 24);
+
   } else {
     Serial.println("MPR121 not found!");
     // TODO: print text on the LED matrix?
@@ -402,23 +407,23 @@ void setupText() {
 }
 
 
-ScrollingText nextWooMessage() {
-  static ScrollingText next_woo = (ScrollingText)(WOO_MESSAGE + 1); 
+ScrollingText nextCheer() {
+  static ScrollingText next_cheer = (ScrollingText)(random8(CHEER + 1, CHEER_END - 1)); 
 
-  ScrollingText result = next_woo;
+  ScrollingText result = next_cheer;
 
-  next_woo = (ScrollingText)(next_woo + 1);
-  if (next_woo == WOO_MESSAGE_END) {
+  next_cheer = (ScrollingText)(next_cheer + 1);
+  if (next_cheer >= CHEER_END) {
     // TODO: randomize the order every loop. maybe shuffle 4 "decks" of words together so they can sometimes double up
-    next_woo = (ScrollingText)(WOO_MESSAGE + 1);
+    next_cheer = (ScrollingText)(CHEER + 1);
   }
 
   return result;
 }
 
 void setText(ScrollingText text) {
-  if (text == WOO_MESSAGE || text == WOO_MESSAGE_END) {
-    text = nextWooMessage();
+  if (text == CHEER || text == CHEER_END) {
+    text = nextCheer();
   }
 
   // TODO: make this optional?
@@ -451,8 +456,12 @@ void setText(ScrollingText text) {
   } else if (text == dance) {
     text_chars = (unsigned char *)text_dance;
     text_len = sizeof(text_dance) - 1;
+  } else if (text == gambino) {
+    text_chars = (unsigned char *)text_gambino;
+    text_len = sizeof(text_gambino) - 1;
   } else {
-    Serial.println("ERROR! Missed handling a ScrollingText enum");
+    Serial.print("ERROR! Missed handling a ScrollingText enum ");
+    Serial.println(text);
     return;
   }
 
@@ -670,11 +679,11 @@ void mapFrequenciesToVisualizerMatrix() {
     uint8_t i = visualizerXtoFrequencyId[x];
 
     // draw a border
-    if (g_flashlight_state == flashlight_state::on) {
-      visualizer_matrix(shifted_x, 0) = visualizer_white;
+    visualizer_matrix(shifted_x, 0) = visualizer_color;
+    if (g_flashlight_state == flashlight_state::on && shifted_x % 2 == 1) {
+      // visualizer_matrix(shifted_x, 0) = visualizer_white;
       visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_white;
     } else {
-      visualizer_matrix(shifted_x, 0) = visualizer_color;
       visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_color;
     }
 
@@ -837,7 +846,7 @@ bool setThingsFromTouch() {
   DEBUG_PRINT("current touch: ");
   DEBUG_PRINTLN2(g_current_touch, BIN);
 
-  if (g_changed_touch & _BV(brim_left) && g_current_touch & _BV(brim_left)) {
+  if (g_changed_touch & _BV(brim_right) && g_current_touch & _BV(brim_right)) {
     // TODO: require another input to be held?
     // tap brim_left to increase brightness
     // TODO: this is too slow. allow holding to continue decreasing
@@ -853,7 +862,7 @@ bool setThingsFromTouch() {
     } else {
       DEBUG_PRINTLN("Brightness @ max");
     }
-  } else if (g_changed_touch & _BV(brim_right) && g_current_touch & _BV(brim_right)) {
+  } else if (g_changed_touch & _BV(brim_left) && g_current_touch & _BV(brim_left)) {
     // TODO: require another input to be held?
     // tap brim_right to decrease brightness
     // TODO: this is too slow. allow holding to continue decreasing
@@ -882,8 +891,18 @@ bool setThingsFromTouch() {
       DEBUG_PRINTLN("Starting flashlight text");
       setText(flashlight);
     }
+  } else if (g_changed_touch & _BV(top) && g_current_touch & _BV(top)) {
+    if (g_scrolling_text == none) {
+      DEBUG_PRINTLN("Starting a cheer because the top was touched");
+      setText(CHEER);
+    } else {
+      DEBUG_PRINT("Skipping cheer while other text is scrolling ");
+      DEBUG_PRINTLN(g_scrolling_text);
+    }
   } else {
-    DEBUG_PRINTLN("unimplemented touches detected");
+    if (g_current_touch != 0) {
+      DEBUG_PRINTLN("unimplemented touches detected");
+    }
   }
 
   if (brightness_changed) {
@@ -1026,6 +1045,9 @@ void loop() {
       // DEBUG_PRINTLN(scrolling_ret);
       if (scrolling_ret == -1) {
         // when UpdateText returns -1, there is no more text to display and text_matrix is empty
+        DEBUG_PRINT("Scrolling text #");
+        DEBUG_PRINT(g_scrolling_text);
+        DEBUG_PRINTLN(" complete");
         g_scrolling_text = none;
       } else {
         // UpdateText drew a new frame
@@ -1060,7 +1082,7 @@ void loop() {
       // scroll text again
       // TODO: cycle between different text
       // TODO: instead of every_n_seconds, tie to touch sensor and to a bunch of visualizer columns hitting the top in a single frame
-      setText(WOO_MESSAGE);
+      setText(CHEER);
 
       ScrollingMsg.UpdateText();
 
@@ -1095,7 +1117,7 @@ void loop() {
     }
 
     // debug print
-    #ifdef DEBUG
+    #ifdef DEBUG_VERBOSE
       Serial.print(g_highest_ema_magnitude, 2);
       Serial.print(" / ");
       Serial.print(g_highest_max_magnitude, 2);
@@ -1128,7 +1150,7 @@ void loop() {
       Serial.println(" us");
       last_update_micros = micros();
       Serial.flush();
-    #endif
+    #endif  // DEBUG_VERBOSE
 
     new_frame = false;
   }

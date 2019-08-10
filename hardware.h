@@ -39,11 +39,7 @@
 
 enum touches {
   brim_front = 0,
-  brim_left = 2,
-  brim_right = 4,
-  // brim_back = 3,
-  // top_front = 4,
-  // top_left = 5,
-  // top_right = 6,
-  // top_back = 7,
+  top = 2,
+  brim_left = 4,  // blue
+  brim_right = 6,  // green
 };
