@@ -4,15 +4,16 @@
 
 // you can change me!
 // comment INPUT_TOUCH out to disable the touch sensor
-#define INPUT_TOUCH
+// #define INPUT_TOUCH
 //
 
 #include "hardware.h"
 
 // you can change me!
-#define LIGHT_TYPE DOTSTAR_MATRIX_64x8
+#define LIGHT_TYPE EL_WIRE_8
 //
 
+// don't change me
 #if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
   #pragma message "LIGHT_TYPE = dotstar matrix 2x 32x8"
   // TODO: MATRIX_CS_PIN if we plan on actually using the SD card
@@ -26,15 +27,16 @@
   #define OUTPUT_LED_MATRIX
 #elif LIGHT_TYPE == EL_WIRE_8
   #pragma message "LIGHT_TYPE = EL Wire x8"
-  #error "WIP"
 #elif LIGHT_TYPE == DOTSTAR_STRIP_120
   #pragma message "LIGHT_TYPE = dotstar strip 120"
-  #error "WIP"
 
   #define OUTPUT_LED
+
+  #error "WIP"
 #else
   #error "unsupported LIGHT_TYPE"
 #endif
+// END don't change me
 
 // with an older pattern, 52 the battery lasted 4.5 hours. 32 the battery lasted 6 hours
 // const uint8_t min_brightness = 22;
@@ -48,6 +50,8 @@ const uint8_t visualizer_white_value = 255;
 #ifdef OUTPUT_LED_MATRIX
   const uint8_t numLEDsX = 64;
   const uint8_t numLEDsY = 8;
+#elif LIGHT_TYPE == EL_WIRE_8
+  // 
 #else
   #error WIP
 #endif
@@ -59,8 +63,15 @@ const uint16_t maxBin = 18000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18
 // TODO: make this configurable while the program is running?
 #ifdef OUTPUT_LED_MATRIX
   const uint8_t numFreqBands = 16;  // this needs to fit into a 64 wide matrix
+#elif defined OUTPUT_LED
+  const uint8_t numFreqBands = 11;
+
+  const int maxOn = numOutputs * 3 / 4;
 #elif LIGHT_TYPE == EL_WIRE_8
   const uint8_t numFreqBands = 8;
+
+  // we don't want all the lights to be on at once
+  const int maxOn = 5;
 #else
   #error WIP
 #endif
@@ -142,7 +153,7 @@ const uint16_t maxBin = 18000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18
 
 #endif
 
-#ifdef OUTPUT_LED
+#ifdef OUTPUT_LED_MATRIX
   // the shortest amount of time to leave an output on before starting to change it
   // it will stay on longer than this depending on time required to dim to off
   // 200 bpm = 75 ms = 13.333 Hz
@@ -151,8 +162,11 @@ const uint16_t maxBin = 18000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18
   // minimum ms to show a light before allowing it (and sometimes surrounding lights) to change
   const uint16_t minOnMs = 200; // 118? 150? 169? 184? 200? 250? 337?
   // TODO: round minOnMs to be a multiple of ms_per_frame
+#elif defined OUTPUT_LED
+  // TODO: tune this now that we track the sound differently
+  const unsigned int minOnMs = 337; // 118? 150? 184? 200? 250?
 #elif LIGHT_TYPE == EL_WIRE_8
-  const uint16_t minOnMs = 200;  // TODO: tune this
+  const uint16_t minOnMs = 184;  // TODO: tune this
 #else
   #error WIP
 #endif

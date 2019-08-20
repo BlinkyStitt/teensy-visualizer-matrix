@@ -9,8 +9,12 @@
 
 //Pins for Teensy 3.2 w/ Audio board
 // TODO: document more pins. audio: 9, 11, 13, 18, 19, 22, 23. 
+#define SERIAL_1_RX 0
+#define SERIAL_1_TX 1
 #define FLOATING_PIN 3  // any floating pin. used to seed random
+// Serial 3 is RX=7, TX=8 which conflicts with anything on SPI
 #define SPI_MOSI_PIN 7  // alt pin for use with audio board
+// Serial 2 is RX=9, TX=10 which conflicts with the SD card
 #define SDCARD_CS_PIN 10
 #define SPI_MISO_PIN 12
 #define RED_LED 13  // this is also used by the audio board's sgtl5000 RX line
@@ -35,6 +39,7 @@
   #define MPR121_ADDRESS 0x5A
 
   // TODO: not all the models have touches
+  // TODO: support more than one hat design
   enum touches {
     brim_front = 0,
     top = 2,

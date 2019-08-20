@@ -88,6 +88,11 @@ float g_highest_max_magnitude = 0;
 
   // the text and sprites and visualizer get combined into this
   cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
+#elif LIGHT_TYPE == EL_WIRE_8
+  // TODO: support multiple el sequencers
+  unsigned char el_output[1] = {0};
+#else
+  #error WIP
 #endif
 
 AudioInputI2S i2s1;  // xy=139,91
@@ -210,8 +215,10 @@ void setupSD() {
       leds(x, y) = color;
     }
   }
+#endif
 
-  void setupMatrix() {
+void setupLights() {
+  #ifdef OUTPUT_LED_MATRIX
     // TODO: clock select pin for FastLED to OUTPUT like we do for the SDCARD?
 
     // do NOT turn off the built-in LED. it is tied to the audio board!
@@ -302,8 +309,18 @@ void setupSD() {
 
     FastLED.clear(true);
     FastLED.show();
-  }
-#endif
+  #elif LIGHT_TYPE == EL_WIRE_8
+    // https://www.pjrc.com/teensy/td_uart.html
+    Serial1.begin(9600);  // RX=0 (yellow), TX=1 (green)
+    // TODO: if we want more Serial outputs, they will have to be bit-banged. Audio shield uses the pins we need for Serial2 and Serial3
+
+    Serial.print("Waiting for Serial1... ");
+    while (!Serial1) {
+      ; // wait for serial port to connect
+    }
+    Serial.println("DONE");
+  #endif
+}
 
 void setupAudio() {
   // Audio requires memory to work. I haven't seen this go over 11
@@ -378,22 +395,24 @@ void setupRandom() {
   #endif
 }
 
-void setupTouch() {
-  pinMode(MPR121_IRQ, INPUT);
+#ifdef INPUT_TOUCH
+  void setupTouch() {
+    pinMode(MPR121_IRQ, INPUT);
 
-  g_touch_available = cap.begin(MPR121_ADDRESS);
+    g_touch_available = cap.begin(MPR121_ADDRESS);
 
-  if (g_touch_available) {
-    Serial.println("MPR121 found.");
+    if (g_touch_available) {
+      Serial.println("MPR121 found.");
 
-    // cap.setThresholds(12, 6);  // this is the default
-    cap.setThresholds(48, 24);
+      // cap.setThresholds(12, 6);  // this is the default
+      cap.setThresholds(48, 24);
 
-  } else {
-    Serial.println("MPR121 not found!");
-    // TODO: print text on the LED matrix?
+    } else {
+      Serial.println("MPR121 not found!");
+      // TODO: print text on the LED matrix?
+    }
   }
-}
+#endif
 
 #ifdef OUTPUT_LED_MATRIX
   void setupMatrixText() {
@@ -498,14 +517,13 @@ void setup() {
 
   setupSD();
 
-  #ifdef OUTPUT_LED_MATRIX
-    // right now, once we setup the lights, we can't use the SD card anymore
-    // TODO: add a CS pin for the lights
-    setupMatrix();
-  #endif
+  // right now, once we setup an LED matrix, we can't use the SD card anymore
+  // TODO: add a CS pin for the lights
+  setupLights();
 
-  // TODO: make this optional
-  setupTouch();
+  #ifdef INPUT_TOUCH
+    setupTouch();
+  #endif
 
   setupAudio();
 
@@ -606,9 +624,9 @@ void updateFrequencies() {
   }
 }
 
-#ifdef OUTPUT_LED_MATRIX
-  // TODO: args instead of globals
-  void mapFrequenciesToVisualizerMatrix() {
+// TODO: args instead of globals
+void mapFrequenciesToOutputBuffer() {
+  #ifdef OUTPUT_LED_MATRIX
     // shift increments every current_ms_per_shift milliseconds and is used to slowly modify the pattern
     static uint16_t shift = 0;
     static uint8_t ms_per_shift_index = 0;
@@ -692,7 +710,7 @@ void updateFrequencies() {
       if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0)) {
         // use the averaged_scaled_magnitude to calculate the height for this color
         // TODO: this should be an exponential scale. i think we can use findE()
-        uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, 0, 255, 0, visualizerNumLEDsY - 1);
+        uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, UINT8_MIN, UINT8_MAX, 0, visualizerNumLEDsY - 1);
 
         // TODO: these should be on a different struct dedicated to the matrix
         if (highestIndexToLight != frequencies[i].level) {
@@ -835,93 +853,137 @@ void updateFrequencies() {
       }
     }
 
-    // TODO: debug timer
+    // TODO: debug timer?
+  #elif LIGHT_TYPE == EL_WIRE_8
+    // TODO: better support multiple sequencers
+    // TODO: have 2 or 3 wires per frequency and turn more/less of them on
+    // TODO: use maxOn. need to do two loops then. one to turn off, another to turn on
+    for (int i = 0; i < numFreqBands; i++) {
+
+      bool should_be_on = frequencies[i].averaged_scaled_magnitude >= UINT8_MAX * activate_difference;
+
+      if (should_be_on != frequencies[i].level) {
+        bool level_changed = true;
+        if (should_be_on) {
+          // if the wire is supposed to be on...
+
+          if (millis() < frequencies[i].nextChangeMs) {
+            // nevermind! we need to wait longer before changing this in order to reduce flicker
+            should_be_on = frequencies[i].level;
+            level_changed = false;
+          }
+        } else {
+          // if the wire is supposed to be off...
+          if (millis() < frequencies[i].nextChangeMs) {
+            // nevermind! we need to wait longer before changing this in order to reduce flicker
+            should_be_on = frequencies[i].level;
+            level_changed = false;
+          }
+        }
+
+        if (level_changed) {
+          frequencies[i].level = should_be_on;
+
+          // the level has changed! set timer to prevent flicker
+          // TODO: two timers so that lights can turn off slower than they turn on?
+          frequencies[i].nextChangeMs = millis() + minOnMs;
+        }
+      }
+
+      if (frequencies[i].level > 0) {
+        bitSet(el_output[i / 8], i % 8);
+      } else {
+        bitClear(el_output[i / 8], i % 8);
+      }
+    }
+  #endif
+}
+
+#ifdef INPUT_TOUCH
+  bool setThingsFromTouch() {
+    bool brightness_changed = false;
+
+    // TODO: zfill
+    DEBUG_PRINT("changed touch: ");
+    DEBUG_PRINTLN2(g_changed_touch, BIN);
+    DEBUG_PRINT("current touch: ");
+    DEBUG_PRINTLN2(g_current_touch, BIN);
+
+    if (g_changed_touch & _BV(brim_right) && g_current_touch & _BV(brim_right)) {
+      // TODO: require another input to be held?
+      // tap brim_left to increase brightness
+      // TODO: this is too slow. allow holding to continue decreasing
+      if (g_brightness < max_brightness) {
+        brightness_changed = true;
+
+        g_brightness++;
+
+        DEBUG_PRINT("Brightness increased to ");
+        DEBUG_PRINTLN(g_brightness);
+
+        FastLED.setBrightness(g_brightness);
+      } else {
+        DEBUG_PRINTLN("Brightness @ max");
+      }
+    } else if (g_changed_touch & _BV(brim_left) && g_current_touch & _BV(brim_left)) {
+      // TODO: require another input to be held?
+      // tap brim_right to decrease brightness
+      // TODO: this is too slow. allow holding to continue decreasing
+      if (g_brightness > min_brightness) {
+        brightness_changed = true;
+
+        g_brightness--;
+
+        DEBUG_PRINT("Brightness decreased to ");
+        DEBUG_PRINTLN(g_brightness);
+
+        FastLED.setBrightness(g_brightness);
+      } else {
+        DEBUG_PRINTLN("Brightness @ min");
+      }
+    } else if (g_changed_touch & _BV(brim_front) && g_current_touch & _BV(brim_front)) {
+      // tap brim_front to toggle flashlight
+      // TODO: make it so we have to hold it down for a moment
+      if (g_scrolling_text == flashlight) {
+        // the button was pressed while we were already scrolling "flashlight". cancel the currently scrolling text
+        DEBUG_PRINTLN("Stopping flashlight text");
+        setText(none);
+      } else {
+        // start scrolling "flashlight"
+        // the flashlight will toggle once the message is done scrolling
+        DEBUG_PRINTLN("Starting flashlight text");
+        setText(flashlight);
+      }
+    } else if (g_changed_touch & _BV(top) && g_current_touch & _BV(top)) {
+      if (g_scrolling_text == none) {
+        DEBUG_PRINTLN("Starting a cheer because the top was touched");
+        setText(CHEER);
+      } else {
+        DEBUG_PRINT("Skipping cheer while other text is scrolling ");
+        DEBUG_PRINTLN(g_scrolling_text);
+      }
+    } else {
+      if (g_current_touch != 0) {
+        DEBUG_PRINTLN("unimplemented touches detected");
+      }
+    }
+
+    if (brightness_changed) {
+      // save different brightness for flashlight and visualizer
+      if (g_flashlight_state == on) {
+        g_brightness_flashlight = g_brightness;
+      } else {
+        g_brightness_visualizer = g_brightness;
+      }
+    }
+
+    // TODO: check touch for button to trigger scrolling text
+    // if (g_scrolling_text == none) {
+    // }
+
+    return brightness_changed;
   }
 #endif
-
-bool setThingsFromTouch() {
-  bool brightness_changed = false;
-
-  // TODO: zfill
-  DEBUG_PRINT("changed touch: ");
-  DEBUG_PRINTLN2(g_changed_touch, BIN);
-  DEBUG_PRINT("current touch: ");
-  DEBUG_PRINTLN2(g_current_touch, BIN);
-
-  if (g_changed_touch & _BV(brim_right) && g_current_touch & _BV(brim_right)) {
-    // TODO: require another input to be held?
-    // tap brim_left to increase brightness
-    // TODO: this is too slow. allow holding to continue decreasing
-    if (g_brightness < max_brightness) {
-      brightness_changed = true;
-
-      g_brightness++;
-
-      DEBUG_PRINT("Brightness increased to ");
-      DEBUG_PRINTLN(g_brightness);
-
-      FastLED.setBrightness(g_brightness);
-    } else {
-      DEBUG_PRINTLN("Brightness @ max");
-    }
-  } else if (g_changed_touch & _BV(brim_left) && g_current_touch & _BV(brim_left)) {
-    // TODO: require another input to be held?
-    // tap brim_right to decrease brightness
-    // TODO: this is too slow. allow holding to continue decreasing
-    if (g_brightness > min_brightness) {
-      brightness_changed = true;
-
-      g_brightness--;
-
-      DEBUG_PRINT("Brightness decreased to ");
-      DEBUG_PRINTLN(g_brightness);
-
-      FastLED.setBrightness(g_brightness);
-    } else {
-      DEBUG_PRINTLN("Brightness @ min");
-    }
-  } else if (g_changed_touch & _BV(brim_front) && g_current_touch & _BV(brim_front)) {
-    // tap brim_front to toggle flashlight
-    // TODO: make it so we have to hold it down for a moment
-    if (g_scrolling_text == flashlight) {
-      // the button was pressed while we were already scrolling "flashlight". cancel the currently scrolling text
-      DEBUG_PRINTLN("Stopping flashlight text");
-      setText(none);
-    } else {
-      // start scrolling "flashlight"
-      // the flashlight will toggle once the message is done scrolling
-      DEBUG_PRINTLN("Starting flashlight text");
-      setText(flashlight);
-    }
-  } else if (g_changed_touch & _BV(top) && g_current_touch & _BV(top)) {
-    if (g_scrolling_text == none) {
-      DEBUG_PRINTLN("Starting a cheer because the top was touched");
-      setText(CHEER);
-    } else {
-      DEBUG_PRINT("Skipping cheer while other text is scrolling ");
-      DEBUG_PRINTLN(g_scrolling_text);
-    }
-  } else {
-    if (g_current_touch != 0) {
-      DEBUG_PRINTLN("unimplemented touches detected");
-    }
-  }
-
-  if (brightness_changed) {
-    // save different brightness for flashlight and visualizer
-    if (g_flashlight_state == on) {
-      g_brightness_flashlight = g_brightness;
-    } else {
-      g_brightness_visualizer = g_brightness;
-    }
-  }
-
-  // TODO: check touch for button to trigger scrolling text
-  // if (g_scrolling_text == none) {
-  // }
-
-  return brightness_changed;
-}
 
 #ifdef OUTPUT_LED
   bool setBrightnessFromVolumeKnob() {
@@ -1041,12 +1103,7 @@ void loop() {
   if (fft1024.available()) {
     updateFrequencies();
 
-    #ifdef OUTPUT_LED_MATRIX
-      // TODO: pass args to these functions instead of modifying globals
-      mapFrequenciesToVisualizerMatrix();
-    #else 
-      #error "WIP"
-    #endif
+    mapFrequenciesToOutputBuffer();
 
     new_frame = true;
   }
@@ -1125,16 +1182,34 @@ void loop() {
   if (new_frame) {
     #ifdef OUTPUT_LED_MATRIX
       combineMatrixes();
+    #elif LIGHT_TYPE == EL_WIRE_8
+      // no need to combine frames on the el wire since it only shows frequencies
     #else
       #error WIP
     #endif
 
-    // if dithering is off, we can run at a faster framerate
-    if (g_dither) {
-      FastLED.delay((draw_micros * num_dither_shows) / 1000);
-    } else {
-      FastLED.show();
-    }
+    #ifdef OUTPUT_LED
+      // if dithering is off, we can run at a faster framerate
+      if (g_dither) {
+        FastLED.delay((draw_micros * num_dither_shows) / 1000);
+      } else {
+        FastLED.show();
+      }
+    #elif LIGHT_TYPE == EL_WIRE_8
+      // send the bytes to their devices
+      // TODO: better support multiple devices
+      Serial1.write(el_output[0]);
+      //Serial2.write(el_output[1]);
+      //Serial3.write(el_output[2]);
+
+      // TODO: delay?
+      // delay(9);
+
+      // make sure we finished writing
+      Serial1.flush();
+      //Serial2.flush();
+      //Serial3.flush();
+    #endif
 
     // debug print
     #ifdef DEBUG_VERBOSE
