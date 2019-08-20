@@ -21,15 +21,6 @@
 #include "FontBS.h"
 #include "config.h"
 
-#if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
-  #pragma message "LIGHT_TYPE = dotstar matrix 2x 32x8"
-  // TODO: MATRIX_CS_PIN if we plan on actually using the SD card
-#elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
-  #pragma message "LIGHT_TYPE = neopixel matrix 2x 32x8"
-#else
-  #error "unsupported LIGHT_TYPE"
-#endif
-
 uint16_t freqBands[numFreqBands];
 
 // keep track of the current levels. this is a sum of multiple frequency bins.
@@ -48,54 +39,56 @@ float g_highest_current_magnitude = 0;
 float g_highest_ema_magnitude = 0;
 float g_highest_max_magnitude = 0;
 
-// TODO: move this to a seperate file so that we can support multiple led/el light combinations
-cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
+#ifdef OUTPUT_LED_MATRIX
+  // TODO: move this to a seperate file so that we can support multiple led/el light combinations
+  cLEDMatrix<visualizerNumLEDsX, visualizerNumLEDsY, VERTICAL_ZIGZAG_MATRIX> visualizer_matrix;
 
-cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> text_matrix;
-cLEDText ScrollingMsg;
+  cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> text_matrix;
+  cLEDText ScrollingMsg;
 
-// cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> sprite_matrix;
-// cLEDSprites Sprites(&sprite_matrix);
+  // cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> sprite_matrix;
+  // cLEDSprites Sprites(&sprite_matrix);
 
-// #define SHAPE_FRAMES   4
-// #define SHAPE_WIDTH    6
-// #define SHAPE_HEIGHT   6
-// const uint8_t ShapeData[] = 
-// {
-//   // frame 0
-//   B8_1BIT(00110000),
-//   B8_1BIT(01001000),
-//   B8_1BIT(10000100),
-//   B8_1BIT(10100100),
-//   B8_1BIT(01001000),
-//   B8_1BIT(00110000),
-//   // frame 1
-//   B8_1BIT(00110000),
-//   B8_1BIT(01001000),
-//   B8_1BIT(10100100),
-//   B8_1BIT(10000100),
-//   B8_1BIT(01001000),
-//   B8_1BIT(00110000),
-//   // frame 2
-//   B8_1BIT(00110000),
-//   B8_1BIT(01001000),
-//   B8_1BIT(10010100),
-//   B8_1BIT(10000100),
-//   B8_1BIT(01001000),
-//   B8_1BIT(00110000),
-//   // frame 3
-//   B8_1BIT(00110000),
-//   B8_1BIT(01001000),
-//   B8_1BIT(10000100),
-//   B8_1BIT(10010100),
-//   B8_1BIT(01001000),
-//   B8_1BIT(00110000),
-// };
-// struct CRGB ColorTable[1] = { CRGB(64, 128, 255) };
-// cSprite Shape(SHAPE_WIDTH, SHAPE_HEIGHT, ShapeData, SHAPE_FRAMES, _1BIT, ColorTable, ShapeData);
+  // #define SHAPE_FRAMES   4
+  // #define SHAPE_WIDTH    6
+  // #define SHAPE_HEIGHT   6
+  // const uint8_t ShapeData[] = 
+  // {
+  //   // frame 0
+  //   B8_1BIT(00110000),
+  //   B8_1BIT(01001000),
+  //   B8_1BIT(10000100),
+  //   B8_1BIT(10100100),
+  //   B8_1BIT(01001000),
+  //   B8_1BIT(00110000),
+  //   // frame 1
+  //   B8_1BIT(00110000),
+  //   B8_1BIT(01001000),
+  //   B8_1BIT(10100100),
+  //   B8_1BIT(10000100),
+  //   B8_1BIT(01001000),
+  //   B8_1BIT(00110000),
+  //   // frame 2
+  //   B8_1BIT(00110000),
+  //   B8_1BIT(01001000),
+  //   B8_1BIT(10010100),
+  //   B8_1BIT(10000100),
+  //   B8_1BIT(01001000),
+  //   B8_1BIT(00110000),
+  //   // frame 3
+  //   B8_1BIT(00110000),
+  //   B8_1BIT(01001000),
+  //   B8_1BIT(10000100),
+  //   B8_1BIT(10010100),
+  //   B8_1BIT(01001000),
+  //   B8_1BIT(00110000),
+  // };
+  // struct CRGB ColorTable[1] = { CRGB(64, 128, 255) };
+  // cSprite Shape(SHAPE_WIDTH, SHAPE_HEIGHT, ShapeData, SHAPE_FRAMES, _1BIT, ColorTable, ShapeData);
 
-// the text and sprites and visualizer get combined into this
-cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
+  // the text and sprites and visualizer get combined into this
+  cLEDMatrix<numLEDsX, numLEDsY, VERTICAL_ZIGZAG_MATRIX> leds;
+#endif
 
 AudioInputI2S i2s1;  // xy=139,91
 AudioOutputI2S i2s2; // xy=392,32
@@ -109,6 +102,7 @@ AudioControlSGTL5000 audioShield; // xy=366,225
 // where as disabling sleep will cause values to ease into their correct position smoothly and with slightly greater accuracy
 ResponsiveAnalogRead volume_knob(VOLUME_KNOB, false);
 
+// TODO: only do this if there is a define saying to
 // up to 12 touches all detected from one breakout board
 // You can have up to 4 on one i2c bus
 Adafruit_MPR121 cap = Adafruit_MPR121();
@@ -128,6 +122,7 @@ unsigned long draw_micros = 0;
 unsigned long last_update_micros = 0;
 // unsigned long lastDraw = 0;
 
+// TODO: only do this if we are using FastLED
 uint8_t g_brightness = 0, g_brightness_visualizer = 0, g_brightness_flashlight = 0;
 bool g_dither = true;
 // in order for dithering to work, we need to be able to FastLED.draw multiple times within a single frame
@@ -207,104 +202,108 @@ void setupSD() {
   // read values from the SD card using IniFile
 }
 
-void colorPattern(CRGB::HTMLColorCode color) {
-  // TODO: sin wave
-  for (uint8_t x = 0; x < numLEDsX; x++) {
-    uint8_t y = x % numLEDsY;
-    leds(x, y) = color;
+#ifdef OUTPUT_LED_MATRIX
+  void colorPattern(CRGB::HTMLColorCode color) {
+    // TODO: sin wave
+    for (uint8_t x = 0; x < numLEDsX; x++) {
+      uint8_t y = x % numLEDsY;
+      leds(x, y) = color;
+    }
   }
-}
 
-void setupLights() {
-  // TODO: clock select pin for FastLED to OUTPUT like we do for the SDCARD?
+  void setupMatrix() {
+    // TODO: clock select pin for FastLED to OUTPUT like we do for the SDCARD?
 
-  // do NOT turn off the built-in LED. it is tied to the audio board!
+    // do NOT turn off the built-in LED. it is tied to the audio board!
 
-  #if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
-    Serial.println("Setting up dotstar 64x8 matrix...");
-    // with pins 0/1 and 1500kHz data rate, this drew a single frame in ~8ms. faster rates crashed or flickered when the battery was low
-    // with pins 14/7 and 4000kHz data rate, this drew a single frame in ~4ms. faster rates caused flickerin
-    FastLED.addLeds<APA102, SPI_MOSI_PIN, SPI_SCK_PIN, BGR, DATA_RATE_KHZ(4000)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
-  #elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
-    Serial.println("Setting up neopixel 2x 32x8 matrix...");
-    // neopixels have a fixed data rate of 800kHz
+    #if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
+      Serial.println("Setting up dotstar 64x8 matrix...");
+      // with pins 0/1 and 1500kHz data rate, this drew a single frame in ~8ms. faster rates crashed or flickered when the battery was low
+      // with pins 14/7 and 4000kHz data rate, this drew a single frame in ~4ms. faster rates caused flickerin
+      FastLED.addLeds<APA102, SPI_MOSI_PIN, SPI_SCK_PIN, BGR, DATA_RATE_KHZ(4000)>(leds[0], leds.Size()).setCorrection(TypicalSMD5050);
+    #elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
+      Serial.println("Setting up neopixel 2x 32x8 matrix...");
+      // neopixels have a fixed data rate of 800kHz
 
-    // serial output takes ~16.8ms
-    // int half_size = leds.Size() / 2;
-    // FastLED.addLeds<NEOPIXEL, MATRIX_DATA_PIN_1>(leds[0], half_size).setCorrection(TypicalSMD5050);
-    // FastLED.addLeds<NEOPIXEL, MATRIX_DATA_PIN_2>(leds[half_size], half_size).setCorrection(TypicalSMD5050);
+      // serial output takes ~16.8ms
+      // int half_size = leds.Size() / 2;
+      // FastLED.addLeds<NEOPIXEL, MATRIX_DATA_PIN_1>(leds[0], half_size).setCorrection(TypicalSMD5050);
+      // FastLED.addLeds<NEOPIXEL, MATRIX_DATA_PIN_2>(leds[half_size], half_size).setCorrection(TypicalSMD5050);
 
-    // parallel output takes ~8.4ms
-    // WS2811_PORTD: 2,14,7,8,6,20,21,5
-    // WS2811_PORTC: 15,22,23,9,10,13,11,12,28,27,29,30 (these last 4 are pads on the bottom of the teensy)
-    // WS2811_PORTDC: 2,14,7,8,6,20,21,5,15,22,23,9,10,13,11,12 - 16 way parallel
-    FastLED.addLeds<WS2811_PORTD, 2>(leds[0], leds.Size() / 2);
-  #else
-    #error "unsupported LIGHT_TYPE"
-  #endif
+      // parallel output takes ~8.4ms
+      // WS2811_PORTD: 2,14,7,8,6,20,21,5
+      // WS2811_PORTC: 15,22,23,9,10,13,11,12,28,27,29,30 (these last 4 are pads on the bottom of the teensy)
+      // WS2811_PORTDC: 2,14,7,8,6,20,21,5,15,22,23,9,10,13,11,12 - 16 way parallel
+      FastLED.addLeds<WS2811_PORTD, 2>(leds[0], leds.Size() / 2);
+    #else
+      #error "unsupported LIGHT_TYPE"
+    #endif
 
-  // TODO: what should this be set to? the flexible panels are much larger
-  // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
-  // the on/off switch only does 2 amps (and 2 amps is really bright)
-  FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 2000);
-  // FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
+    // TODO: what should this be set to? the flexible panels are much larger
+    // led matrix max is 15 amps, but because its flexible, best to keep it max of 5 amps. then we have 2 boards, so multiply by 2
+    // the on/off switch only does 2 amps (and 2 amps is really bright)
+    FastLED.setMaxPowerInVoltsAndMilliamps(3.7, 2000);
+    // FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 120); // when running through teensy's usb port, the max draw is much lower than with a battery
 
-  // we use the volume knob to set the default brightness
-  // sometimes the first read is 0, so give it multiple tries to wake up
-  setBrightnessFromVolumeKnob();
-  delay(100);
-  setBrightnessFromVolumeKnob();
-  delay(100);
-  setBrightnessFromVolumeKnob();
+    // we use the volume knob to set the default brightness
+    // sometimes the first read is 0, so give it multiple tries to wake up
+    setBrightnessFromVolumeKnob();
+    delay(100);
+    setBrightnessFromVolumeKnob();
+    delay(100);
+    setBrightnessFromVolumeKnob();
 
-  // TODO: default to brighter? (still max at 255 though)
-  g_brightness_flashlight = g_brightness;
+    // TODO: default to brighter? (still max at 255 though)
+    g_brightness_flashlight = g_brightness;
 
-  FastLED.clear(true);
+    FastLED.clear(true);
 
-  // show red, green, blue, so that we make sure the lights are configured correctly
-  Serial.println("Showing red...");
-  colorPattern(CRGB::Red);
+    // show red, green, blue, so that we make sure the lights are configured correctly
+    Serial.println("Showing red...");
+    colorPattern(CRGB::Red);
 
-  // time FastLED.show so we can calculate maximum frame rate
-  draw_micros = micros();
-  FastLED.show();
-  draw_micros = micros() - draw_micros;
+    // time FastLED.show so we can calculate maximum frame rate
+    draw_micros = micros();
+    FastLED.show();
+    draw_micros = micros() - draw_micros;
 
-  Serial.print("Draw time for show: ");
-  Serial.print(draw_micros);
-  Serial.println(" us");
+    Serial.print("Draw time for show: ");
+    Serial.print(draw_micros);
+    Serial.println(" us");
 
-  // TODO: calculate num_dither_shows based on brightness and visualizer_color_value
+    // TODO: calculate num_dither_shows based on brightness and visualizer_color_value
 
-  // TODO: bring this back once we have ms_per_frame for sprite/text animations
-  // TODO: maybe have a "min_ms_per_frame" for checking dither until then? 2x256 parallel neopixels with dithering run loop in 23ms
-  // float ms_per_frame_needed_for_dither = draw_micros * num_dither_shows / 1000.0;
-  // g_dither_works_with_framerate = (ms_per_frame_needed_for_dither <= ms_per_frame);
-  // if (g_dither_works_with_framerate) {
-  //   Serial.println("Dither works with framerate.");
-  // } else {
-  //   Serial.print("Dither does NOT work with framerate! Need ");
-  //   Serial.print(ms_per_frame_needed_for_dither - ms_per_frame);
-  //   Serial.println(" more ms");
-  //   g_dither = false;
-  //   FastLED.setDither(g_dither);
-  // }
+    // TODO: bring this back once we have ms_per_frame for sprite/text animations
+    // TODO: maybe have a "min_ms_per_frame" for checking dither until then? 2x256 parallel neopixels with dithering run loop in 23ms
+    // float ms_per_frame_needed_for_dither = draw_micros * num_dither_shows / 1000.0;
+    // g_dither_works_with_framerate = (ms_per_frame_needed_for_dither <= ms_per_frame);
+    // if (g_dither_works_with_framerate) {
+    //   Serial.println("Dither works with framerate.");
+    // } else {
+    //   Serial.print("Dither does NOT work with framerate! Need ");
+    //   Serial.print(ms_per_frame_needed_for_dither - ms_per_frame);
+    //   Serial.println(" more ms");
+    //   g_dither = false;
+    //   FastLED.setDither(g_dither);
+    // }
 
-  // now delay for more time to make sure that fastled can power this many lights and update with this bandwidth
-  FastLED.delay(1500 - draw_micros / 1000);
+    #ifdef DEBUG
+      // now delay for more time to make sure that fastled can power this many lights and update with this bandwidth
+      FastLED.delay(1500 - draw_micros / 1000);
 
-  Serial.println("Showing green...");
-  colorPattern(CRGB::Green);
-  FastLED.delay(1500);
+      Serial.println("Showing green...");
+      colorPattern(CRGB::Green);
+      FastLED.delay(1500);
 
-  Serial.println("Showing blue...");
-  colorPattern(CRGB::Blue);
-  FastLED.delay(1500);
+      Serial.println("Showing blue...");
+      colorPattern(CRGB::Blue);
+      FastLED.delay(1500);
+    #endif
 
-  FastLED.clear(true);
-  FastLED.show();
-}
+    FastLED.clear(true);
+    FastLED.show();
+  }
+#endif
 
 void setupAudio() {
   // Audio requires memory to work. I haven't seen this go over 11
@@ -396,93 +395,95 @@ void setupTouch() {
   }
 }
 
-void setupText() {
-  ScrollingMsg.SetFont(BSFontData);
+#ifdef OUTPUT_LED_MATRIX
+  void setupMatrixText() {
+    ScrollingMsg.SetFont(BSFontData);
 
-  ScrollingMsg.Init(&text_matrix, text_matrix.Width(), ScrollingMsg.FontHeight() + 1, 0, 1);
+    ScrollingMsg.Init(&text_matrix, text_matrix.Width(), ScrollingMsg.FontHeight() + 1, 0, 1);
 
-  ScrollingMsg.SetScrollDirection(SCROLL_LEFT);
+    ScrollingMsg.SetScrollDirection(SCROLL_LEFT);
 
-  setText(debug);
-}
-
-
-ScrollingText nextCheer() {
-  static ScrollingText next_cheer = (ScrollingText)(random8(CHEER + 1, CHEER_END - 1)); 
-
-  ScrollingText result = next_cheer;
-
-  next_cheer = (ScrollingText)(next_cheer + 1);
-  if (next_cheer >= CHEER_END) {
-    // TODO: randomize the order every loop. maybe shuffle 4 "decks" of words together so they can sometimes double up
-    next_cheer = (ScrollingText)(CHEER + 1);
+    setText(debug);
   }
 
-  return result;
-}
 
-void setText(ScrollingText text) {
-  if (text == CHEER || text == CHEER_END) {
-    text = nextCheer();
+  ScrollingText nextCheer() {
+    static ScrollingText next_cheer = (ScrollingText)(random8(CHEER + 1, CHEER_END - 1)); 
+
+    ScrollingText result = next_cheer;
+
+    next_cheer = (ScrollingText)(next_cheer + 1);
+    if (next_cheer >= CHEER_END) {
+      // TODO: randomize the order every loop. maybe shuffle 4 "decks" of words together so they can sometimes double up
+      next_cheer = (ScrollingText)(CHEER + 1);
+    }
+
+    return result;
   }
 
-  // TODO: make this optional?
-  fill_solid(text_matrix[0], text_matrix.Size(), CRGB::Black);
+  void setText(ScrollingText text) {
+    if (text == CHEER || text == CHEER_END) {
+      text = nextCheer();
+    }
 
-  g_scrolling_text = text;
+    // TODO: make this optional?
+    fill_solid(text_matrix[0], text_matrix.Size(), CRGB::Black);
 
-  unsigned char *text_chars;
-  unsigned long text_len;
+    g_scrolling_text = text;
 
-  // i miss rust's match statement
-  if (text == none) {
-    text_chars = (unsigned char *)text_woo1;
-    text_len = 0;
-  } else if (text == debug) {
-    text_chars = (unsigned char *)text_debug;
-    text_len = sizeof(text_debug);
-  } else if (text == flashlight) {
-    text_chars = (unsigned char *)text_flashlight;
-    text_len = sizeof(text_flashlight) - 1;
-  } else if (text == woo1) {
-    text_chars = (unsigned char *)text_woo1;
-    text_len = sizeof(text_woo1) - 1;
-  } else if (text == woo2) {
-    text_chars = (unsigned char *)text_woo2;
-    text_len = sizeof(text_woo2) - 1;
-  } else if (text == party) {
-    text_chars = (unsigned char *)text_party;
-    text_len = sizeof(text_party) - 1;
-  } else if (text == dance) {
-    text_chars = (unsigned char *)text_dance;
-    text_len = sizeof(text_dance) - 1;
-  } else if (text == gambino) {
-    text_chars = (unsigned char *)text_gambino;
-    text_len = sizeof(text_gambino) - 1;
-  } else {
-    Serial.print("ERROR! Missed handling a ScrollingText enum ");
-    Serial.println(text);
-    return;
+    unsigned char *text_chars;
+    unsigned long text_len;
+
+    // i miss rust's match statement
+    if (text == none) {
+      text_chars = (unsigned char *)text_woo1;
+      text_len = 0;
+    } else if (text == debug) {
+      text_chars = (unsigned char *)text_debug;
+      text_len = sizeof(text_debug);
+    } else if (text == flashlight) {
+      text_chars = (unsigned char *)text_flashlight;
+      text_len = sizeof(text_flashlight) - 1;
+    } else if (text == woo1) {
+      text_chars = (unsigned char *)text_woo1;
+      text_len = sizeof(text_woo1) - 1;
+    } else if (text == woo2) {
+      text_chars = (unsigned char *)text_woo2;
+      text_len = sizeof(text_woo2) - 1;
+    } else if (text == party) {
+      text_chars = (unsigned char *)text_party;
+      text_len = sizeof(text_party) - 1;
+    } else if (text == dance) {
+      text_chars = (unsigned char *)text_dance;
+      text_len = sizeof(text_dance) - 1;
+    } else if (text == gambino) {
+      text_chars = (unsigned char *)text_gambino;
+      text_len = sizeof(text_gambino) - 1;
+    } else {
+      Serial.print("ERROR! Missed handling a ScrollingText enum ");
+      Serial.println(text);
+      return;
+    }
+
+    ScrollingMsg.SetText(text_chars, text_len);
   }
 
-  ScrollingMsg.SetText(text_chars, text_len);
-}
-
-// void setupSprites() {
-//   // sprites run at 60fps
-//   Shape.SetPositionFrameMotionOptions(
-//     0/*X*/, 
-//     0/*Y*/, 
-//     0/*Frame*/, 
-//     8/*FrameRate*/, 
-//     +1/*XChange*/, 
-//     8/*XRate*/, 
-//     +1/*YChange*/, 
-//     16/*YRate*/, 
-//     SPRITE_DETECT_EDGE | SPRITE_X_KEEPIN | SPRITE_Y_KEEPIN
-//   );
-//   Sprites.AddSprite(&Shape);
-// }
+  // void setupSprites() {
+  //   // sprites run at 60fps
+  //   Shape.SetPositionFrameMotionOptions(
+  //     0/*X*/, 
+  //     0/*Y*/, 
+  //     0/*Frame*/, 
+  //     8/*FrameRate*/, 
+  //     +1/*XChange*/, 
+  //     8/*XRate*/, 
+  //     +1/*YChange*/, 
+  //     16/*YRate*/, 
+  //     SPRITE_DETECT_EDGE | SPRITE_X_KEEPIN | SPRITE_Y_KEEPIN
+  //   );
+  //   Sprites.AddSprite(&Shape);
+  // }
+#endif
 
 void setup() {
   debug_serial(115200, 2000);
@@ -497,10 +498,13 @@ void setup() {
 
   setupSD();
 
-  // right now, once we setup the lights, we can't use the SD card anymore
-  // TODO: add a CS pin for the lights
-  setupLights();
+  #ifdef OUTPUT_LED_MATRIX
+    // right now, once we setup the lights, we can't use the SD card anymore
+    // TODO: add a CS pin for the lights
+    setupMatrix();
+  #endif
 
+  // TODO: make this optional
   setupTouch();
 
   setupAudio();
@@ -511,9 +515,11 @@ void setup() {
 
   setupRandom();
 
-  setupText();
+  #ifdef OUTPUT_LED_MATRIX
+    setupMatrixText();
 
-  // setupSprites();
+    // setupSprites();
+  #endif
 
   Serial.println("Starting...");
 }
@@ -542,12 +548,6 @@ void updateLevelsFromFFT() {
 
   g_highest_current_magnitude = highest;
 }
-
-// // https://forum.pjrc.com/threads/33390-FFT-convert-real-values-to-decibles
-// float db(float n, float r) {
-//   if (n <= 0) return r - 96;  // or whatever you consider to be "off"
-//   return r + log10f(n) * 20.0f;
-// }
 
 void updateFrequencies() {
   // read FFT frequency data into a bunch of levels. assign each level a color and a brightness
@@ -606,236 +606,238 @@ void updateFrequencies() {
   }
 }
 
-// TODO: args instead of globals
-void mapFrequenciesToVisualizerMatrix() {
-  // shift increments every current_ms_per_shift milliseconds and is used to slowly modify the pattern
-  static uint16_t shift = 0;
-  static uint8_t ms_per_shift_index = 0;
-  static uint16_t current_ms_per_shift = ms_per_shift[ms_per_shift_index];
-  static unsigned long next_shift_at_ms = 0;
-  // cycle between shifting up and shifting down
-  static bool reverse_rotation = true;
-  // static unsigned long next_change_ms_per_shift = 0;
+#ifdef OUTPUT_LED_MATRIX
+  // TODO: args instead of globals
+  void mapFrequenciesToVisualizerMatrix() {
+    // shift increments every current_ms_per_shift milliseconds and is used to slowly modify the pattern
+    static uint16_t shift = 0;
+    static uint8_t ms_per_shift_index = 0;
+    static uint16_t current_ms_per_shift = ms_per_shift[ms_per_shift_index];
+    static unsigned long next_shift_at_ms = 0;
+    // cycle between shifting up and shifting down
+    static bool reverse_rotation = true;
+    // static unsigned long next_change_ms_per_shift = 0;
 
-  // cycle between lights coming from the top and the bottom
-  static bool should_flip_y[visualizerNumLEDsX] = {false};
-  static uint16_t map_visualizer_y[visualizerNumLEDsY] = {0};
-  static bool flip_y = false;
-  static bool new_pattern = true;
+    // cycle between lights coming from the top and the bottom
+    static bool should_flip_y[visualizerNumLEDsX] = {false};
+    static uint16_t map_visualizer_y[visualizerNumLEDsY] = {0};
+    static bool flip_y = false;
+    static bool new_pattern = true;
 
-  static uint8_t last_frame_height[visualizerNumLEDsX] = {0};
-  static uint8_t lowestIndexToLight = 1;  // 0 is the border
-  static uint8_t lowestIndexToLightWhite = 4;// visualizerNumLEDsY - 1;
+    static uint8_t last_frame_height[visualizerNumLEDsX] = {0};
+    static uint8_t lowestIndexToLight = 1;  // 0 is the border
+    static uint8_t lowestIndexToLightWhite = 4;// visualizerNumLEDsY - 1;
 
-  // OPTION 1: cycle frames_per_shift every X seconds
-  // TODO: every X seconds change the frames_per_shift
-  // if (millis() >= next_change_frames_per_shift) {
-  //   frames_per_shift_index++;
-  //   // TODO: we have 3, but slow is boring
-  //   if (frames_per_shift_index >= 2) {
-  //     frames_per_shift_index = 0;
-  //   }
-  //   // TODO: different lengths for different modes
-  //   // TODO: have a struct for this
-  //   next_change_frames_per_shift = millis() + 3000;
-  // }
-  // // TODO: do an interesting curve on current_frames_per_shift to head towards frames_per_shift[frames_per_shift_index]. ema might work for now
-  // current_frames_per_shift = frames_per_shift[frames_per_shift_index];
+    // OPTION 1: cycle frames_per_shift every X seconds
+    // TODO: every X seconds change the frames_per_shift
+    // if (millis() >= next_change_frames_per_shift) {
+    //   frames_per_shift_index++;
+    //   // TODO: we have 3, but slow is boring
+    //   if (frames_per_shift_index >= 2) {
+    //     frames_per_shift_index = 0;
+    //   }
+    //   // TODO: different lengths for different modes
+    //   // TODO: have a struct for this
+    //   next_change_frames_per_shift = millis() + 3000;
+    // }
+    // // TODO: do an interesting curve on current_frames_per_shift to head towards frames_per_shift[frames_per_shift_index]. ema might work for now
+    // current_frames_per_shift = frames_per_shift[frames_per_shift_index];
 
-  // OPTION 2: oscillate frames_per_shift between a slow and a fast speed
-  // static uint16_t loud_frame_counter = 0;
-  // bool increment_loud_frame_counter = false;
-  // current_frames_per_shift = map(cubicwave8(loud_frame_counter), 0, 255, frames_per_shift[0], frames_per_shift[2]);
-  // Serial.print("frames_per_shift: ");
-  // Serial.println(current_frames_per_shift);
+    // OPTION 2: oscillate frames_per_shift between a slow and a fast speed
+    // static uint16_t loud_frame_counter = 0;
+    // bool increment_loud_frame_counter = false;
+    // current_frames_per_shift = map(cubicwave8(loud_frame_counter), 0, 255, frames_per_shift[0], frames_per_shift[2]);
+    // Serial.print("frames_per_shift: ");
+    // Serial.println(current_frames_per_shift);
 
-  // OPTION 3: if loud_frame_counter was incremented multiple times in one frame, have a chance to rotate once at high speed instead of changing direction
+    // OPTION 3: if loud_frame_counter was incremented multiple times in one frame, have a chance to rotate once at high speed instead of changing direction
 
-  // TODO: if we are going too fast for too long, slow down
+    // TODO: if we are going too fast for too long, slow down
 
-  if (new_pattern) {
-    // TODO: more patterns. maybe one where it grows from the middle. or goes from the top and the bottom
+    if (new_pattern) {
+      // TODO: more patterns. maybe one where it grows from the middle. or goes from the top and the bottom
 
-    // flip the bottom and the top
-    for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
-      map_visualizer_y[y] = 7 - y;
-    }
-
-    new_pattern = false;
-  }
-
-  CRGB visualizer_white = CRGB(CHSV(0, 0, visualizer_white_value));
-
-  for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
-    // we take the absolute value because shift might negative
-    uint8_t shifted_x = abs((x + shift) % visualizerNumLEDsX);
-
-    uint8_t visualizer_hue = map(x, 0, visualizerNumLEDsX - 1, 0, 255);
-
-    // TODO: color palettes instead of simple rainbow hue
-    // TODO: variable brightness? variable saturation?
-    CHSV visualizer_color = CHSV(visualizer_hue, 255, visualizer_color_value);
-
-    uint8_t i = visualizerXtoFrequencyId[x];
-
-    // draw a border
-    visualizer_matrix(shifted_x, 0) = visualizer_color;
-    if (g_flashlight_state == flashlight_state::on && shifted_x % 2 == 1) {
-      // visualizer_matrix(shifted_x, 0) = visualizer_white;
-      visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_white;
-    } else {
-      visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_color;
-    }
-
-    // if this column is on or should be turned on
-    if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0)) {
-      // use the averaged_scaled_magnitude to calculate the height for this color
-      // TODO: this should be an exponential scale. i think we can use findE()
-      uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, 0, 255, 0, visualizerNumLEDsY - 1);
-
-      // TODO: these should be on a different struct dedicated to the matrix
-      if (highestIndexToLight != frequencies[i].level) {
-        bool level_changed = true;
-        if (highestIndexToLight > frequencies[i].level) {
-          // if the bar is growing...
-
-          if (millis() < frequencies[i].nextChangeMs) {
-            // nevermind! we need to wait longer before changing this in order to reduce flicker
-            highestIndexToLight = frequencies[i].level;
-            level_changed = false;
-          }
-        } else {
-          // if the bar is shrinking, limit to shrinking 1 level per X ms...
-          if (millis() < frequencies[i].nextChangeMs) {
-            // nevermind! we need to wait longer before changing this in order to reduce flicker
-            highestIndexToLight = frequencies[i].level;
-            level_changed = false;
-          } else {
-            highestIndexToLight = frequencies[i].level - 1;
-          }
-        }
-
-        if (level_changed) {
-          frequencies[i].level = highestIndexToLight;
-
-          // the level has changed! set timer to prevent flicker
-          // TODO: two timers so that lights can turn off slower than they turn on?
-          frequencies[i].nextChangeMs = millis() + minOnMs;
-        }
+      // flip the bottom and the top
+      for (uint8_t y = 0; y < visualizerNumLEDsY; y++) {
+        map_visualizer_y[y] = 7 - y;
       }
 
-      for (uint8_t y = lowestIndexToLight; y <= visualizerNumLEDsY - 1; y++) {
-        uint8_t shifted_y = y;
-        if (should_flip_y[x]) {
-          shifted_y = map_visualizer_y[shifted_y];
+      new_pattern = false;
+    }
+
+    CRGB visualizer_white = CRGB(CHSV(0, 0, visualizer_white_value));
+
+    for (uint8_t x = 0; x < visualizerNumLEDsX; x++) {
+      // we take the absolute value because shift might negative
+      uint8_t shifted_x = abs((x + shift) % visualizerNumLEDsX);
+
+      uint8_t visualizer_hue = map(x, 0, visualizerNumLEDsX - 1, 0, 255);
+
+      // TODO: color palettes instead of simple rainbow hue
+      // TODO: variable brightness? variable saturation?
+      CHSV visualizer_color = CHSV(visualizer_hue, 255, visualizer_color_value);
+
+      uint8_t i = visualizerXtoFrequencyId[x];
+
+      // draw a border
+      visualizer_matrix(shifted_x, 0) = visualizer_color;
+      if (g_flashlight_state == flashlight_state::on && shifted_x % 2 == 1) {
+        // visualizer_matrix(shifted_x, 0) = visualizer_white;
+        visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_white;
+      } else {
+        visualizer_matrix(shifted_x, visualizerNumLEDsY - 1) = visualizer_color;
+      }
+
+      // if this column is on or should be turned on
+      if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0)) {
+        // use the averaged_scaled_magnitude to calculate the height for this color
+        // TODO: this should be an exponential scale. i think we can use findE()
+        uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, 0, 255, 0, visualizerNumLEDsY - 1);
+
+        // TODO: these should be on a different struct dedicated to the matrix
+        if (highestIndexToLight != frequencies[i].level) {
+          bool level_changed = true;
+          if (highestIndexToLight > frequencies[i].level) {
+            // if the bar is growing...
+
+            if (millis() < frequencies[i].nextChangeMs) {
+              // nevermind! we need to wait longer before changing this in order to reduce flicker
+              highestIndexToLight = frequencies[i].level;
+              level_changed = false;
+            }
+          } else {
+            // if the bar is shrinking, limit to shrinking 1 level per X ms...
+            if (millis() < frequencies[i].nextChangeMs) {
+              // nevermind! we need to wait longer before changing this in order to reduce flicker
+              highestIndexToLight = frequencies[i].level;
+              level_changed = false;
+            } else {
+              highestIndexToLight = frequencies[i].level - 1;
+            }
+          }
+
+          if (level_changed) {
+            frequencies[i].level = highestIndexToLight;
+
+            // the level has changed! set timer to prevent flicker
+            // TODO: two timers so that lights can turn off slower than they turn on?
+            frequencies[i].nextChangeMs = millis() + minOnMs;
+          }
         }
 
-        if (y < highestIndexToLight) {
-          // simple color bar
-          visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
-        } else if (y == highestIndexToLight) {
-          if (y < lowestIndexToLightWhite) {
-            // very short bars shouldn't have any white at the top
+        for (uint8_t y = lowestIndexToLight; y <= visualizerNumLEDsY - 1; y++) {
+          uint8_t shifted_y = y;
+          if (should_flip_y[x]) {
+            shifted_y = map_visualizer_y[shifted_y];
+          }
+
+          if (y < highestIndexToLight) {
+            // simple color bar
             visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
-
-            last_frame_height[x] = 0;
-          } else {
-            // taller bars should have white at the top
-            // but only if they are the same height or taller than they were on the previous frame. this way shrinking bars are topped by colors
-            if (highestIndexToLight >= last_frame_height[x]) {
-              visualizer_matrix(shifted_x, shifted_y) = visualizer_white;
-
-              last_frame_height[x] = highestIndexToLight;
-            } else {
+          } else if (y == highestIndexToLight) {
+            if (y < lowestIndexToLightWhite) {
+              // very short bars shouldn't have any white at the top
               visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
 
-              // todo: this is probably wrong
-              last_frame_height[x] = highestIndexToLight + 1;
-            }
-          }
-
-          if (highestIndexToLight >= visualizerNumLEDsY - 1) {
-            // loud_frame_counter++;
-            // increment_loud_frame_counter = true;
-
-            uint8_t r = random8(100);
-
-            // TODO: this doesn't work as well with the bars being two wide. need configurable 
-            if (r < 34) {
-              EVERY_N_SECONDS(3) {
-                // TODO: instead of a hard rotate, cycle speeds
-                reverse_rotation = !reverse_rotation; // TODO: enum instead of bool?
-                next_shift_at_ms = millis() + current_ms_per_shift;
-              }
-            } else if (r < 67) {
-              // TODO: maybe instead of EVERY_N_SECONDS, have a timer for each x?
-              EVERY_N_SECONDS(6) {
-                // if we hit the top, light both ends white and flip this for the next time
-                visualizer_matrix(shifted_x, 0) = visualizer_white;
-
-                flip_y = should_flip_y[x] = !should_flip_y[x];
-              }
+              last_frame_height[x] = 0;
             } else {
-              // do nothing
+              // taller bars should have white at the top
+              // but only if they are the same height or taller than they were on the previous frame. this way shrinking bars are topped by colors
+              if (highestIndexToLight >= last_frame_height[x]) {
+                visualizer_matrix(shifted_x, shifted_y) = visualizer_white;
+
+                last_frame_height[x] = highestIndexToLight;
+              } else {
+                visualizer_matrix(shifted_x, shifted_y) = visualizer_color;
+
+                // todo: this is probably wrong
+                last_frame_height[x] = highestIndexToLight + 1;
+              }
             }
+
+            if (highestIndexToLight >= visualizerNumLEDsY - 1) {
+              // loud_frame_counter++;
+              // increment_loud_frame_counter = true;
+
+              uint8_t r = random8(100);
+
+              // TODO: this doesn't work as well with the bars being two wide. need configurable 
+              if (r < 34) {
+                EVERY_N_SECONDS(3) {
+                  // TODO: instead of a hard rotate, cycle speeds
+                  reverse_rotation = !reverse_rotation; // TODO: enum instead of bool?
+                  next_shift_at_ms = millis() + current_ms_per_shift;
+                }
+              } else if (r < 67) {
+                // TODO: maybe instead of EVERY_N_SECONDS, have a timer for each x?
+                EVERY_N_SECONDS(6) {
+                  // if we hit the top, light both ends white and flip this for the next time
+                  visualizer_matrix(shifted_x, 0) = visualizer_white;
+
+                  flip_y = should_flip_y[x] = !should_flip_y[x];
+                }
+              } else {
+                // do nothing
+              }
+            }
+          } else if (y < visualizerNumLEDsY - 1) {
+            // fill the rest in black (except the border)
+            // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
+            // visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
+            visualizer_matrix(shifted_x, shifted_y) = CRGB::Black;
           }
-        } else if (y < visualizerNumLEDsY - 1) {
-          // fill the rest in black (except the border)
-          // TODO: not sure if this should fade or go direct to black. we already have fading on the visualizer
-          // visualizer_matrix(x, y).fadeToBlackBy(fade_factor * 2);
-          visualizer_matrix(shifted_x, shifted_y) = CRGB::Black;
         }
-      }
-    } else {
-      // the visualizer (but not the border!) should be off
+      } else {
+        // the visualizer (but not the border!) should be off
 
-      if (i < numFreqBands) {
-        if (millis() < frequencies[i].nextChangeMs) {
-          // nevermind! we need to wait longer to reduce flicker
-          // TODO: we might not need this
-          continue;
+        if (i < numFreqBands) {
+          if (millis() < frequencies[i].nextChangeMs) {
+            // nevermind! we need to wait longer to reduce flicker
+            // TODO: we might not need this
+            continue;
+          }
+
+          frequencies[i].level = 0;
         }
 
-        frequencies[i].level = 0;
+        for (uint8_t y = lowestIndexToLight; y < numLEDsY - 1; y++) {
+          // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
+          // TODO: fading looks bad since they all fade at even rate and we want the top light to turn off first
+          visualizer_matrix(shifted_x, y) = CRGB::Black;
+        }
+
+        // follow the loudest sound
+        // TODO: do this in a seperate loop so that flip_y is the same for all entries?
+        should_flip_y[x] = flip_y;
       }
+    }
 
-      for (uint8_t y = lowestIndexToLight; y < numLEDsY - 1; y++) {
-        // visualizer_matrix(x, y).fadeToBlackBy(fade_factor);
-        // TODO: fading looks bad since they all fade at even rate and we want the top light to turn off first
-        visualizer_matrix(shifted_x, y) = CRGB::Black;
+    // if (increment_loud_frame_counter) {
+    //   loud_frame_counter++;
+    // }
+
+    if (millis() >= next_shift_at_ms) {
+      // DEBUG_PRINT("SHIFTED! now: ");
+      // DEBUG_PRINT(millis());
+      // DEBUG_PRINT(" ms; goal: ");
+      // DEBUG_PRINT(next_shift_at_ms);
+      // DEBUG_PRINT(" ms; diff: ");
+      // DEBUG_PRINT(millis() - next_shift_at_ms);
+      // DEBUG_PRINT(" ms; next in: ");
+      // DEBUG_PRINTLN(current_ms_per_shift);
+
+      next_shift_at_ms = millis() + current_ms_per_shift;
+
+      if (reverse_rotation) {
+        shift--;
+      } else {
+        shift++;
       }
-
-      // follow the loudest sound
-      // TODO: do this in a seperate loop so that flip_y is the same for all entries?
-      should_flip_y[x] = flip_y;
     }
+
+    // TODO: debug timer
   }
-
-  // if (increment_loud_frame_counter) {
-  //   loud_frame_counter++;
-  // }
-
-  if (millis() >= next_shift_at_ms) {
-    // DEBUG_PRINT("SHIFTED! now: ");
-    // DEBUG_PRINT(millis());
-    // DEBUG_PRINT(" ms; goal: ");
-    // DEBUG_PRINT(next_shift_at_ms);
-    // DEBUG_PRINT(" ms; diff: ");
-    // DEBUG_PRINT(millis() - next_shift_at_ms);
-    // DEBUG_PRINT(" ms; next in: ");
-    // DEBUG_PRINTLN(current_ms_per_shift);
-
-    next_shift_at_ms = millis() + current_ms_per_shift;
-
-    if (reverse_rotation) {
-      shift--;
-    } else {
-      shift++;
-    }
-  }
-
-  // TODO: debug timer
-}
+#endif
 
 bool setThingsFromTouch() {
   bool brightness_changed = false;
@@ -921,193 +923,211 @@ bool setThingsFromTouch() {
   return brightness_changed;
 }
 
-bool setBrightnessFromVolumeKnob() {
-  bool brightness_changed = false;
+#ifdef OUTPUT_LED
+  bool setBrightnessFromVolumeKnob() {
+    bool brightness_changed = false;
 
-  EVERY_N_MILLIS(100) {
-    volume_knob.update();
-  }
-
-  if (volume_knob.hasChanged() || g_brightness == 0) {
-    int knob_value = volume_knob.getValue();
-
-    // TODO: we used to set 
-    uint8_t brightness = map(knob_value, 0, 1023, min_brightness, max_brightness);
-
-    if (brightness != g_brightness) {
-      brightness_changed = true;
-
-      DEBUG_PRINT("volume knob changed: ");
-      DEBUG_PRINT(knob_value);
-      DEBUG_PRINT("; new brightness: ");
-      DEBUG_PRINTLN(brightness);
-
-      // TODO: only call this if we are actually changing
-
-      // split brightness doesn't work with the knob
-      g_brightness = brightness;
-
-      FastLED.setBrightness(g_brightness);
-
-      if (g_dither_works_with_framerate) {
-        bool dither = (brightness >= dither_brightness_cutoff);
-        if (dither != g_dither) {
-          g_dither = dither;
-
-          FastLED.setDither(g_dither);
-        }
-      }
+    EVERY_N_MILLIS(100) {
+      volume_knob.update();
     }
-  }
 
-  return brightness_changed;
-}
+    if (volume_knob.hasChanged() || g_brightness == 0) {
+      int knob_value = volume_knob.getValue();
 
-void combineMatrixes() {
-  // TODO: what should we do here? how should we overlay/interleave the different matrixes into one?
+      // TODO: we used to set 
+      uint8_t brightness = map(knob_value, 0, 1023, min_brightness, max_brightness);
 
-  static CHSV visualizer_white = CHSV(0, 0, visualizer_white_value);
-  static CRGB black = CRGB::Black;
+      if (brightness != g_brightness) {
+        brightness_changed = true;
 
-  // update the value in case it changed
-  visualizer_white.value = visualizer_white_value;
+        DEBUG_PRINT("volume knob changed: ");
+        DEBUG_PRINT(knob_value);
+        DEBUG_PRINT("; new brightness: ");
+        DEBUG_PRINTLN(brightness);
 
-  // TODO: this could probably be a lot more efficient
-  for (uint16_t x = 0; x < numLEDsX; x++) {
-    uint16_t vis_x = x % visualizerNumLEDsX;
+        // TODO: only call this if we are actually changing
 
-    for (uint16_t y = 0; y < numLEDsY; y++) {
-      // if visualizer is white, display it
-      // else if text, display it
-      // else if sprite, display it
-      // else display the visualizer
+        // split brightness doesn't work with the knob
+        g_brightness = brightness;
 
-      // TODO: how are masks vs off going to be detected?
-      // TODO: text_matrix OR sprite_matrix
-      if (y < visualizerNumLEDsY && visualizer_matrix(vis_x, y) == visualizer_white) {
-        leds(x, y) = visualizer_white;
-      } else if (g_scrolling_text != none && text_matrix(numLEDsX - 1 - x, y) != black) {
-        // TODO: mask?
-        // why is this backwards, but the other matrixes aren't?
-        leds(x, y) = text_matrix(numLEDsX - 1 - x, y);
-      // } else if (g_text_complete && sprite_matrix(numLEDsX - x, y) != black) {
-      //   leds(x, y) = sprite_matrix(numLEDsX - x, y);
-      } else if (y < visualizerNumLEDsY) {
-        leds(x, y) = visualizer_matrix(vis_x, y);
-      } else {
-        leds(x, y) = CRGB::Black;
-      }
-    }
-  }
+        FastLED.setBrightness(g_brightness);
 
-  // TODO: return false if nothing changed? we can skip drawing then
-}
+        if (g_dither_works_with_framerate) {
+          bool dither = (brightness >= dither_brightness_cutoff);
+          if (dither != g_dither) {
+            g_dither = dither;
 
-void loop() {
-  static bool new_frame = false;
-
-  if (g_touch_available) {
-    // if IRQ is low, there is new touch data to read
-    if (digitalRead(MPR121_IRQ) == LOW) {
-      g_current_touch = cap.touched();
-
-      g_changed_touch = g_current_touch ^ g_last_touch;
-
-      if (setThingsFromTouch()) {
-        // we can wait for a next audio frame
-        // new_frame = true;
-      };
-
-      g_last_touch = g_current_touch;
-    }
-  } else {
-    if (setBrightnessFromVolumeKnob()) {
-      // this floats a little and causes draws when we don't really care
-      // we can wait for a next audio frame
-      // new_frame = true;
-    }
-  }
-
-  if (fft1024.available()) {
-    updateFrequencies();
-
-    // TODO: pass args to these functions instead of modifying globals
-    mapFrequenciesToVisualizerMatrix();
-
-    new_frame = true;
-  }
-
-  if (g_scrolling_text != none) {
-    EVERY_N_MILLIS(90) {
-      // draw text
-      int scrolling_ret = ScrollingMsg.UpdateText();
-      // DEBUG_PRINT("Scrolling ret: ");
-      // DEBUG_PRINTLN(scrolling_ret);
-      if (scrolling_ret == -1) {
-        // when UpdateText returns -1, there is no more text to display and text_matrix is empty
-        DEBUG_PRINT("Scrolling text #");
-        DEBUG_PRINT(g_scrolling_text);
-        DEBUG_PRINTLN(" complete");
-        g_scrolling_text = none;
-      } else {
-        // UpdateText drew a new frame
-        new_frame = true;
-
-        if (scrolling_ret == 1) {
-          // when UpdateText returns 1, "FLASHLIGHT" text and a delay is done being displayed
-          // toggle flashlight mode
-          if (g_flashlight_state == on) {
-            g_flashlight_state = off;
-
-            if (g_brightness_visualizer) {
-              g_brightness = g_brightness_visualizer;
-            }
-
-            // TODO: remove a spinning white light sprite in the front
-          } else {
-            g_flashlight_state = on;
-
-            if (g_brightness_flashlight) {
-              g_brightness = g_brightness_flashlight;
-            }
-
-            // TODO: add a spinning white light sprite in the front
+            FastLED.setDither(g_dither);
           }
         }
       }
     }
-  } else {
-    // TODO: how often?
-    EVERY_N_SECONDS(300) {
-      // scroll text again
-      // TODO: cycle between different text
-      // TODO: instead of every_n_seconds, tie to touch sensor and to a bunch of visualizer columns hitting the top in a single frame
-      setText(CHEER);
 
-      ScrollingMsg.UpdateText();
+    return brightness_changed;
+  }
+#endif
 
-      new_frame = true;
+#ifdef OUTPUT_LED_MATRIX
+  void combineMatrixes() {
+    // TODO: what should we do here? how should we overlay/interleave the different matrixes into one?
+
+    static CHSV visualizer_white = CHSV(0, 0, visualizer_white_value);
+    static CRGB black = CRGB::Black;
+
+    // update the value in case it changed
+    visualizer_white.value = visualizer_white_value;
+
+    // TODO: this could probably be a lot more efficient
+    for (uint16_t x = 0; x < numLEDsX; x++) {
+      uint16_t vis_x = x % visualizerNumLEDsX;
+
+      for (uint16_t y = 0; y < numLEDsY; y++) {
+        // if visualizer is white, display it
+        // else if text, display it
+        // else if sprite, display it
+        // else display the visualizer
+
+        // TODO: how are masks vs off going to be detected?
+        // TODO: text_matrix OR sprite_matrix
+        if (y < visualizerNumLEDsY && visualizer_matrix(vis_x, y) == visualizer_white) {
+          leds(x, y) = visualizer_white;
+        } else if (g_scrolling_text != none && text_matrix(numLEDsX - 1 - x, y) != black) {
+          // TODO: mask?
+          // why is this backwards, but the other matrixes aren't?
+          leds(x, y) = text_matrix(numLEDsX - 1 - x, y);
+        // } else if (g_text_complete && sprite_matrix(numLEDsX - x, y) != black) {
+        //   leds(x, y) = sprite_matrix(numLEDsX - x, y);
+        } else if (y < visualizerNumLEDsY) {
+          leds(x, y) = visualizer_matrix(vis_x, y);
+        } else {
+          leds(x, y) = CRGB::Black;
+        }
+      }
     }
+
+    // TODO: return false if nothing changed? we can skip drawing then
+  }
+#endif
+
+void loop() {
+  static bool new_frame = false;
+
+  #ifdef INPUT_TOUCH
+    if (g_touch_available) {
+      // if IRQ is low, there is new touch data to read
+      if (digitalRead(MPR121_IRQ) == LOW) {
+        g_current_touch = cap.touched();
+
+        g_changed_touch = g_current_touch ^ g_last_touch;
+
+        if (setThingsFromTouch()) {
+          // we can wait for a next audio frame
+          // new_frame = true;
+        };
+
+        g_last_touch = g_current_touch;
+      }
+    } else {
+      #ifdef OUTPUT_LED
+        if (setBrightnessFromVolumeKnob()) {
+          // this floats a little and causes draws when we don't really care
+          // we can wait for a next audio frame
+          // new_frame = true;
+        }
+      #endif
+    }
+  #endif
+
+  if (fft1024.available()) {
+    updateFrequencies();
+
+    #ifdef OUTPUT_LED_MATRIX
+      // TODO: pass args to these functions instead of modifying globals
+      mapFrequenciesToVisualizerMatrix();
+    #else 
+      #error "WIP"
+    #endif
+
+    new_frame = true;
   }
 
-  // TODO: draw sprites if not drawing text
-  // if (g_text_complete) {
-  //   EVERY_N_MILLIS(1000/60) {
-  //     fill_solid(sprite_matrix[0], sprite_matrix.Size(), CRGB::Black);
+  #ifdef OUTPUT_LED_MATRIX
+    if (g_scrolling_text != none) {
+      EVERY_N_MILLIS(90) {
+        // draw text
+        int scrolling_ret = ScrollingMsg.UpdateText();
+        // DEBUG_PRINT("Scrolling ret: ");
+        // DEBUG_PRINTLN(scrolling_ret);
+        if (scrolling_ret == -1) {
+          // when UpdateText returns -1, there is no more text to display and text_matrix is empty
+          DEBUG_PRINT("Scrolling text #");
+          DEBUG_PRINT(g_scrolling_text);
+          DEBUG_PRINTLN(" complete");
+          g_scrolling_text = none;
+        } else {
+          // UpdateText drew a new frame
+          new_frame = true;
 
-  //     Sprites.UpdateSprites();
+          if (scrolling_ret == 1) {
+            // when UpdateText returns 1, "FLASHLIGHT" text and a delay is done being displayed
+            // toggle flashlight mode
+            if (g_flashlight_state == on) {
+              g_flashlight_state = off;
 
-  //     // TODO: do collision detection for pacman
-  //     //Sprites.DetectCollisions();
+              if (g_brightness_visualizer) {
+                g_brightness = g_brightness_visualizer;
+              }
 
-  //     Sprites.RenderSprites();
+              // TODO: remove a spinning white light sprite in the front
+            } else {
+              g_flashlight_state = on;
 
-  //     new_frame = true;
-  //   }
-  // }
+              if (g_brightness_flashlight) {
+                g_brightness = g_brightness_flashlight;
+              }
+
+              // TODO: add a spinning white light sprite in the front
+            }
+          }
+        }
+      }
+    } else {
+      // TODO: how often?
+      EVERY_N_SECONDS(300) {
+        // scroll text again
+        // TODO: cycle between different text
+        // TODO: instead of every_n_seconds, tie to touch sensor and to a bunch of visualizer columns hitting the top in a single frame
+        setText(CHEER);
+
+        ScrollingMsg.UpdateText();
+
+        new_frame = true;
+      }
+    }
+
+    // TODO: draw sprites if not drawing text
+    // if (g_text_complete) {
+    //   EVERY_N_MILLIS(1000/60) {
+    //     fill_solid(sprite_matrix[0], sprite_matrix.Size(), CRGB::Black);
+
+    //     Sprites.UpdateSprites();
+
+    //     // TODO: do collision detection for pacman
+    //     //Sprites.DetectCollisions();
+
+    //     Sprites.RenderSprites();
+
+    //     new_frame = true;
+    //   }
+    // }
+  #endif
 
   if (new_frame) {
-    combineMatrixes();
+    #ifdef OUTPUT_LED_MATRIX
+      combineMatrixes();
+    #else
+      #error WIP
+    #endif
 
     // if dithering is off, we can run at a faster framerate
     if (g_dither) {

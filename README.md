@@ -21,3 +21,4 @@ Instead of a [single strip of LEDs/8 EL wires](https://github.com/WyseNynja/teen
 * <https://forum.pjrc.com/threads/42958-Question-about-the-spectrum-analyzer-example-best-practises-and-making-it-smooth>
 * <https://plot.ly/~mrlyule/16/equal-loudness-contours-iso-226-2003/#/>
 * <https://pythonhosted.org/pydsm/intro.html>
+* <https://forum.pjrc.com/threads/33390-FFT-convert-real-values-to-decibles>

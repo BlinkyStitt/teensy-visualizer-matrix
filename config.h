@@ -2,9 +2,39 @@
 #include <Arduino.h>
 #endif
 
+// you can change me!
+// comment INPUT_TOUCH out to disable the touch sensor
+#define INPUT_TOUCH
+//
+
 #include "hardware.h"
 
+// you can change me!
 #define LIGHT_TYPE DOTSTAR_MATRIX_64x8
+//
+
+#if LIGHT_TYPE == DOTSTAR_MATRIX_64x8
+  #pragma message "LIGHT_TYPE = dotstar matrix 2x 32x8"
+  // TODO: MATRIX_CS_PIN if we plan on actually using the SD card
+
+  #define OUTPUT_LED
+  #define OUTPUT_LED_MATRIX
+#elif LIGHT_TYPE == NEOPIXEL_MATRIX_2x_32x8
+  #pragma message "LIGHT_TYPE = neopixel matrix 2x 32x8"
+
+  #define OUTPUT_LED
+  #define OUTPUT_LED_MATRIX
+#elif LIGHT_TYPE == EL_WIRE_8
+  #pragma message "LIGHT_TYPE = EL Wire x8"
+  #error "WIP"
+#elif LIGHT_TYPE == DOTSTAR_STRIP_120
+  #pragma message "LIGHT_TYPE = dotstar strip 120"
+  #error "WIP"
+
+  #define OUTPUT_LED
+#else
+  #error "unsupported LIGHT_TYPE"
+#endif
 
 // with an older pattern, 52 the battery lasted 4.5 hours. 32 the battery lasted 6 hours
 // const uint8_t min_brightness = 22;
@@ -15,8 +45,10 @@ const uint8_t max_brightness = 255;
 const uint8_t visualizer_color_value = 185;
 const uint8_t visualizer_white_value = 255;
 
-const uint8_t numLEDsX = 64;
-const uint8_t numLEDsY = 8;
+#ifdef OUTPUT_LED_MATRIX
+  const uint8_t numLEDsX = 64;
+  const uint8_t numLEDsY = 8;
+#endif
 
 // each bin is FREQUENCY_RESOLUTION_HZ (43 Hz with teensy audio shield)
 // const uint16_t minBin = 0;
