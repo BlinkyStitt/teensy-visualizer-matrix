@@ -91,6 +91,19 @@ float g_highest_max_magnitude = 0;
 #elif LIGHT_TYPE == EL_WIRE_8
   // TODO: support multiple el sequencers
   unsigned char el_output[1] = {0};
+
+  // going through the levels loudest to quietest makes it so we can ensure the loudest get turned on ASAP
+  int sortedLevelIndex[numFreqBands];
+
+  /* sort the frequencies
+  *
+  * with help from https://phoxis.org/2012/07/12/get-sorted-index-orderting-of-an-array/
+  * there is probably a better way to do this
+  */
+  static int compare_levels(const void *a, const void *b) {
+    int aa = *((int *)a), bb = *((int *)b);
+    return frequencies[bb].averaged_scaled_magnitude - frequencies[aa].averaged_scaled_magnitude;
+  }
 #else
   #error WIP
 #endif
@@ -345,6 +358,13 @@ void setupAudio() {
   // audioShield.eqBands(0.5, 0.5, 0.0, 0.0, 0.0); // todo: tune this
 
   audioShield.unmuteHeadphone(); // for debugging
+
+  #if LIGHT_TYPE == EL_WIRE_8
+    // setup array for sorting
+    for (int i = 0; i < numFreqBands; i++) {
+      sortedLevelIndex[i] = i;
+    }
+  #endif
 }
 
 void setupRandom() {
@@ -857,40 +877,60 @@ void mapFrequenciesToOutputBuffer() {
   #elif LIGHT_TYPE == EL_WIRE_8
     // TODO: better support multiple sequencers
     // TODO: have 2 or 3 wires per frequency and turn more/less of them on
-    // TODO: use maxOn. need to do two loops then. one to turn off, another to turn on
-    for (int i = 0; i < numFreqBands; i++) {
 
+    static uint8_t numOn = 0;
+    static bool goal_state[numFreqBands] = {0};
+
+    // loop once to turn lights off
+    for (int i = 0; i < numFreqBands; i++) {
       bool should_be_on = frequencies[i].averaged_scaled_magnitude >= UINT8_MAX * activate_difference;
 
-      if (should_be_on != frequencies[i].level) {
-        bool level_changed = true;
-        if (should_be_on) {
-          // if the wire is supposed to be on...
-
-          if (millis() < frequencies[i].nextChangeMs) {
-            // nevermind! we need to wait longer before changing this in order to reduce flicker
-            should_be_on = frequencies[i].level;
-            level_changed = false;
-          }
+      // TODO: better support multiple outputs. don't hard code 8 here since the el sequencer could have a different number of wires
+      if (!should_be_on && bitRead(el_output[i / 8], i % 8) == 1) {
+        // the wire is on, but it is supposed to be off...
+        if (millis() < frequencies[i].nextChangeMs) {
+          // nevermind! we need to wait longer before changing this in order to reduce flicker
+          should_be_on = true;
         } else {
-          // if the wire is supposed to be off...
-          if (millis() < frequencies[i].nextChangeMs) {
-            // nevermind! we need to wait longer before changing this in order to reduce flicker
-            should_be_on = frequencies[i].level;
-            level_changed = false;
-          }
-        }
-
-        if (level_changed) {
-          frequencies[i].level = should_be_on;
-
           // the level has changed! set timer to prevent flicker
           // TODO: two timers so that lights can turn off slower than they turn on?
           frequencies[i].nextChangeMs = millis() + minOnMs;
+
+          numOn--;
         }
       }
 
-      if (frequencies[i].level > 0) {
+      // this is NOT complete. we still need to update lights that should be on (and check their nextChangeMs)
+      goal_state[i] = should_be_on;
+    }
+
+    // sort the levels normalized against their max
+    // this allows us to prioritize turning on for the loudest sounds
+    qsort(sortedLevelIndex, numFreqBands, sizeof(uint8_t), compare_levels);
+
+    // loop again, turning the lights on in sorted order until numOn >= maxOn
+    for (int j = 0; j < numFreqBands; j++) {
+      int i = sortedLevelIndex[j];
+
+      bool should_be_on = goal_state[i];
+
+      // TODO: better support multiple outputs. don't hard code 8 here since the el sequencer could have a different number of wires
+      if (should_be_on && bitRead(el_output[i / 8], i % 8) == 0) {
+        // the wire is off, but it is supposed to be on...
+        if (millis() < frequencies[i].nextChangeMs || numOn >= maxOn) {
+          // nevermind! we need to wait longer before changing this in order to reduce flicker
+          // or we have too many wires on already
+          goal_state[i] = false;
+        } else {
+          // the level has changed! set timer to prevent flicker
+          // TODO: two timers so that lights can turn off slower than they turn on?
+          frequencies[i].nextChangeMs = millis() + minOnMs;
+
+          numOn++;
+        }
+      }
+
+      if (goal_state[i]) {
         bitSet(el_output[i / 8], i % 8);
       } else {
         bitClear(el_output[i / 8], i % 8);
