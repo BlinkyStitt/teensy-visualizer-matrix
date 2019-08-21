@@ -166,7 +166,7 @@ const uint16_t maxBin = 18000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18
   // TODO: tune this now that we track the sound differently
   const unsigned int minOnMs = 337; // 118? 150? 184? 200? 250?
 #elif LIGHT_TYPE == EL_WIRE_8
-  const uint16_t minOnMs = 184;  // TODO: tune this
+  const uint16_t minOnMs = 250;  // TODO: tune this
 #else
   #error WIP
 #endif

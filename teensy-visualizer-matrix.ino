@@ -878,66 +878,31 @@ void mapFrequenciesToOutputBuffer() {
     // TODO: better support multiple sequencers
     // TODO: have 2 or 3 wires per frequency and turn more/less of them on
 
-    static uint8_t numOn = 0;
-    static bool goal_state[numFreqBands] = {0};
+    // TODO: bring this back once it works
+    // static uint8_t numOn = 0;
 
-    // loop once to turn lights off
     for (int i = 0; i < numFreqBands; i++) {
+      if (millis() < frequencies[i].nextChangeMs) {
+        // this light hasn't shown its current state for long enough. skip for now
+        continue;
+      }
+
       bool should_be_on = frequencies[i].averaged_scaled_magnitude > 0;
 
       // TODO: better support multiple outputs. don't hard code 8 here since the el sequencer could have a different number of wires
-      if (!should_be_on && bitRead(el_output[i / 8], i % 8) == 1) {
-        // the wire is on, but it is supposed to be off...
-        if (millis() < frequencies[i].nextChangeMs) {
-          // nevermind! we need to wait longer before changing this in order to reduce flicker
-          should_be_on = true;
-        } else {
-          // the level has changed! set timer to prevent flicker
-          // TODO: two timers so that lights can turn off slower than they turn on?
-          frequencies[i].nextChangeMs = millis() + minOnMs;
-
-          numOn--;
-        }
-      }
-
-      // this is NOT complete. we still need to update lights that should be on (and check their nextChangeMs)
-      goal_state[i] = should_be_on;
-    }
-
-    // sort the levels normalized against their max
-    // this allows us to prioritize turning on for the loudest sounds
-    // TODO! sorting is broken
-    // qsort(sortedLevelIndex, numFreqBands, sizeof(uint8_t), compare_levels);
-
-    // loop again, turning the lights on in sorted order until numOn >= maxOn
-    for (int j = 0; j < numFreqBands; j++) {
-      int i = sortedLevelIndex[j];
-
-      bool should_be_on = goal_state[i];
-
-      // TODO: better support multiple outputs. don't hard code 8 here since the el sequencer could have a different number of wires
-      if (should_be_on && bitRead(el_output[i / 8], i % 8) == 0) {
-        // the wire is off, but it is supposed to be on...
-        if (millis() < frequencies[i].nextChangeMs || numOn >= maxOn) {
-          // nevermind! we need to wait longer before changing this in order to reduce flicker
-          // or we have too many wires on already
-          should_be_on = false;
-        } else {
-          // the level has changed! set timer to prevent flicker
-          // TODO: two timers so that lights can turn off slower than they turn on?
-          frequencies[i].nextChangeMs = millis() + minOnMs;
-
-          numOn++;
-        }
-      }
-
       size_t output_sequencer = i / 8;
       size_t output_bit = i % 8;
 
-      if (should_be_on) {
-        bitSet(output_sequencer, output_bit);
-      } else {
-        bitClear(output_sequencer, output_bit);
+      if (bitRead(el_output[output_sequencer], output_bit) != should_be_on) {
+        // the wire's on/off state has changed! set timer to prevent flicker
+        // TODO: two timers so that lights can turn off slower than they turn on?
+        frequencies[i].nextChangeMs = millis() + minOnMs;
+
+        if (should_be_on) {
+          bitSet(el_output[output_sequencer], output_bit);
+        } else {
+          bitClear(el_output[output_sequencer], output_bit);
+        }
       }
     }
   #endif
@@ -1268,17 +1233,18 @@ void loop() {
       for (uint16_t i = 0; i < numFreqBands; i++) {
         Serial.print("| ");
 
-        // TODO: maybe do something with parity here? 
-        // do some research
-
         #if LIGHT_TYPE == EL_WIRE_8
-          // if (el_output[i] == 1) { // TODO: this is wrong. need bitRead(el_output[i/8], i%8)
-          if (frequencies[i].averaged_scaled_magnitude > 0) {
+          size_t output_sequencer = i / 8;
+          size_t output_bit = i % 8;
+
+          if (bitRead(el_output[output_sequencer], output_bit) == 1) {
             Serial.print("X ");
           } else {
             Serial.print("  ");
           }
         #else
+          // TODO: maybe do something with parity here? do some research
+
           if (frequencies[i].level > 0) {
             Serial.print(frequencies[i].level);
             Serial.print(" ");
