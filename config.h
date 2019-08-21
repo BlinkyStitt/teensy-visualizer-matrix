@@ -200,7 +200,7 @@ const uint16_t maxBin = 18000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18
   const float activate_difference = 0.85f;
 #elif LIGHT_TYPE == EL_WIRE_8
   // TODO: tune this
-  const float activate_difference = 0.85f;
+  const float activate_difference = 0.5f;
 #else
   #error WIP
 #endif

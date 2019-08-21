@@ -883,7 +883,7 @@ void mapFrequenciesToOutputBuffer() {
 
     // loop once to turn lights off
     for (int i = 0; i < numFreqBands; i++) {
-      bool should_be_on = frequencies[i].averaged_scaled_magnitude >= UINT8_MAX * activate_difference;
+      bool should_be_on = frequencies[i].averaged_scaled_magnitude > 0;
 
       // TODO: better support multiple outputs. don't hard code 8 here since the el sequencer could have a different number of wires
       if (!should_be_on && bitRead(el_output[i / 8], i % 8) == 1) {
@@ -906,7 +906,8 @@ void mapFrequenciesToOutputBuffer() {
 
     // sort the levels normalized against their max
     // this allows us to prioritize turning on for the loudest sounds
-    qsort(sortedLevelIndex, numFreqBands, sizeof(uint8_t), compare_levels);
+    // TODO! sorting is broken
+    // qsort(sortedLevelIndex, numFreqBands, sizeof(uint8_t), compare_levels);
 
     // loop again, turning the lights on in sorted order until numOn >= maxOn
     for (int j = 0; j < numFreqBands; j++) {
@@ -920,7 +921,7 @@ void mapFrequenciesToOutputBuffer() {
         if (millis() < frequencies[i].nextChangeMs || numOn >= maxOn) {
           // nevermind! we need to wait longer before changing this in order to reduce flicker
           // or we have too many wires on already
-          goal_state[i] = false;
+          should_be_on = false;
         } else {
           // the level has changed! set timer to prevent flicker
           // TODO: two timers so that lights can turn off slower than they turn on?
@@ -930,10 +931,13 @@ void mapFrequenciesToOutputBuffer() {
         }
       }
 
-      if (goal_state[i]) {
-        bitSet(el_output[i / 8], i % 8);
+      size_t output_sequencer = i / 8;
+      size_t output_bit = i % 8;
+
+      if (should_be_on) {
+        bitSet(output_sequencer, output_bit);
       } else {
-        bitClear(el_output[i / 8], i % 8);
+        bitClear(output_sequencer, output_bit);
       }
     }
   #endif
@@ -1225,6 +1229,7 @@ void loop() {
     #elif LIGHT_TYPE == EL_WIRE_8
       // no need to combine frames on the el wire since it only shows frequencies
     #else
+      DEBUG_PRINTLN("WIP!");
       #error WIP
     #endif
 
@@ -1266,19 +1271,30 @@ void loop() {
         // TODO: maybe do something with parity here? 
         // do some research
 
-        if (frequencies[i].level > 0) {
-          Serial.print(frequencies[i].level);
-          Serial.print(" ");
-        } else {
-          Serial.print("  ");
-        }
+        #if LIGHT_TYPE == EL_WIRE_8
+          // if (el_output[i] == 1) { // TODO: this is wrong. need bitRead(el_output[i/8], i%8)
+          if (frequencies[i].averaged_scaled_magnitude > 0) {
+            Serial.print("X ");
+          } else {
+            Serial.print("  ");
+          }
+        #else
+          if (frequencies[i].level > 0) {
+            Serial.print(frequencies[i].level);
+            Serial.print(" ");
+          } else {
+            Serial.print("  ");
+          }
+        #endif
       }
       Serial.print("| ");
       Serial.print(AudioMemoryUsageMax());
       Serial.print(" blocks | ");
 
-      Serial.print(g_brightness);
-      Serial.print(" bright | ");
+      if (g_brightness) {
+        Serial.print(g_brightness);
+        Serial.print(" bright | ");
+      }
 
       // finish debug print
       Serial.print(micros() - last_update_micros);
