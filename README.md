@@ -1,6 +1,6 @@
 # Teensy Visualizer Matrix
 
-I forked [my code for a single strip of LEDs/8 EL wires](https://github.com/WyseNynja/teensy-visualizer) to instetad run 2 64x8 LED matrixes. Now that that works, I'm merging these repositories back together. I think the EL wire code is working, but I haven't tested it yett.
+I forked [my code for a single strip of LEDs/8 EL wires](https://github.com/WyseNynja/teensy-visualizer) to instead run 2 64x8 LED matrixes. Now that that works, I'm merging these repositories back together. I think the EL wire code is working, but I haven't tested it yett.
 
 ## TODO
 
