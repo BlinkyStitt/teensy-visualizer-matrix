@@ -95,15 +95,15 @@ float g_highest_max_magnitude = 0;
   // going through the levels loudest to quietest makes it so we can ensure the loudest get turned on ASAP
   int sortedLevelIndex[numFreqBands];
 
-  /* sort the frequencies
-  *
-  * with help from https://phoxis.org/2012/07/12/get-sorted-index-orderting-of-an-array/
-  * there is probably a better way to do this
-  */
-  static int compare_levels(const void *a, const void *b) {
-    int aa = *((int *)a), bb = *((int *)b);
-    return frequencies[bb].averaged_scaled_magnitude - frequencies[aa].averaged_scaled_magnitude;
-  }
+  // /* sort the frequencies
+  // *
+  // * with help from https://phoxis.org/2012/07/12/get-sorted-index-orderting-of-an-array/
+  // * there is probably a better way to do this
+  // */
+  // static int compare_levels(const void *a, const void *b) {
+  //   int aa = *((int *)a), bb = *((int *)b);
+  //   return frequencies[bb].averaged_scaled_magnitude - frequencies[aa].averaged_scaled_magnitude;
+  // }
 #else
   #error WIP
 #endif
@@ -496,8 +496,8 @@ void setupRandom() {
       text_chars = (unsigned char *)text_dance;
       text_len = sizeof(text_dance) - 1;
     } else if (text == gambino) {
-      text_chars = (unsigned char *)text_gambino;
-      text_len = sizeof(text_gambino) - 1;
+      text_chars = (unsigned char *)text_venue;
+      text_len = sizeof(text_venue) - 1;
     } else {
       Serial.print("ERROR! Missed handling a ScrollingText enum ");
       Serial.println(text);
@@ -730,7 +730,7 @@ void mapFrequenciesToOutputBuffer() {
       if (i < numFreqBands && (frequencies[i].level > 1 || frequencies[i].averaged_scaled_magnitude > 0)) {
         // use the averaged_scaled_magnitude to calculate the height for this color
         // TODO: this should be an exponential scale. i think we can use findE()
-        uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, UINT8_MIN, UINT8_MAX, 0, visualizerNumLEDsY - 1);
+        uint8_t highestIndexToLight = map(frequencies[i].averaged_scaled_magnitude, 0, UINT8_MAX, 0, visualizerNumLEDsY - 1);
 
         // TODO: these should be on a different struct dedicated to the matrix
         if (highestIndexToLight != frequencies[i].level) {
