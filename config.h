@@ -58,7 +58,7 @@ const uint8_t visualizer_white_value = 255;
 
 // each bin is FREQUENCY_RESOLUTION_HZ (43 Hz with teensy audio shield)
 const uint16_t minBin = 0;
-const uint16_t maxBin = 10000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18kHz
+const uint16_t maxBin = 18000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18kHz
 
 // TODO: make this configurable while the program is running?
 #ifdef OUTPUT_LED_MATRIX
