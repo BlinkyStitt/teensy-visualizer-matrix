@@ -147,7 +147,7 @@ const uint16_t maxBin = 10000.0 / FREQUENCY_RESOLUTION_HZ + 0.5; // skip over 18
   //   99, // 31
   // };
 
-  const uint8_t visualizerNumLEDsX = 32;  // TODO: put this in a struct with frequencyToVisualizer?
+  const uint8_t visualizerNumLEDsX = 16;  // TODO: put this in a struct with frequencyToVisualizer?
   const uint8_t visualizerNumLEDsY = numLEDsY;
   // TODO: make sure visualizerNumLEDsX fits evenly inside numSpreadOutputs
 

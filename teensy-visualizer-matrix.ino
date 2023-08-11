@@ -664,7 +664,7 @@ void mapFrequenciesToOutputBuffer() {
 
     static uint8_t last_frame_height[visualizerNumLEDsX] = {0};
     static uint8_t lowestIndexToLight = 1;  // 0 is the border
-    static uint8_t lowestIndexToLightWhite = 4;// visualizerNumLEDsY - 1;
+    static uint8_t lowestIndexToLightWhite = 3;// visualizerNumLEDsY - 1;
 
     // OPTION 1: cycle frames_per_shift every X seconds
     // TODO: every X seconds change the frames_per_shift
